@@ -39,21 +39,24 @@
                 android:orientation="horizontal"
                 android:layout_marginTop="2dp">
 
+                <!-- FORCED ITALIC AND BOLD ON THE FONT FILE -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="CP"
                     android:textColor="#FF3399"
-                    android:fontFamily="@font/orbitron_italic"
-                    android:textSize="20sp" />
+                    android:fontFamily="@font/orbitron_black"
+                    android:textSize="20sp"
+                    android:textStyle="bold|italic" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="vpn"
                     android:textColor="#00C9A7"
-                    android:fontFamily="@font/orbitron_italic"
-                    android:textSize="20sp" />
+                    android:fontFamily="@font/orbitron_black"
+                    android:textSize="20sp"
+                    android:textStyle="bold|italic" />
             </LinearLayout>
         </LinearLayout>
 
