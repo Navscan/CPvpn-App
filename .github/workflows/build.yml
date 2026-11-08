@@ -20,10 +20,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Decode signing keystore from secret
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
-
       - name: Build Release APK
         run: chmod +x gradlew && ./gradlew assembleRelease
         env:
@@ -37,7 +33,6 @@ jobs:
           VERSION_CODE=$(grep -oP 'versionCode = \K[0-9]+' app/build.gradle.kts)
           VERSION_NAME=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           echo "{\"versionCode\": $VERSION_CODE, \"versionName\": \"$VERSION_NAME\"}" > version.json
-          echo "Generated: $(cat version.json)"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -50,9 +45,6 @@ jobs:
         with:
           tag_name: build-${{ github.run_number }}
           name: CPvpn Build ${{ github.run_number }}
-          body: |
-            Automated build from commit ${{ github.sha }} on branch ${{ github.ref_name }}.
-            Triggered by ${{ github.actor }}.
           files: |
             app/build/outputs/apk/release/CPvpn.apk
             version.json
