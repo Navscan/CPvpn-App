@@ -15,13 +15,17 @@
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
         android:paddingTop="10dp"
-        android:paddingBottom="10dp">
+        android:paddingBottom="10dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:clipChildren="false"
+            android:clipToPadding="false">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -37,7 +41,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="2dp">
+                android:layout_marginTop="2dp"
+                android:clipChildren="false"
+                android:clipToPadding="false">
 
                 <!-- FORCED ITALIC AND BOLD ON THE FONT FILE -->
                 <TextView
@@ -47,7 +53,9 @@
                     android:textColor="#FF3399"
                     android:fontFamily="@font/orbitron_black"
                     android:textSize="20sp"
-                    android:textStyle="bold|italic" />
+                    android:textStyle="bold|italic"
+                    android:clipChildren="false"
+                    android:clipToPadding="false" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -56,7 +64,10 @@
                     android:textColor="#00C9A7"
                     android:fontFamily="@font/orbitron_black"
                     android:textSize="20sp"
-                    android:textStyle="bold|italic" />
+                    android:textStyle="bold|italic"
+                    android:paddingEnd="4dp"
+                    android:clipChildren="false"
+                    android:clipToPadding="false" />
             </LinearLayout>
         </LinearLayout>
 
