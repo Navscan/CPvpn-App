@@ -30,7 +30,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
       - name: Rename APK
-        run: mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/TTVPN.apk
+        run: mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/CPvpn.apk
 
       - name: Generate version.json
         run: |
@@ -42,19 +42,19 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TTVPN
-          path: app/build/outputs/apk/release/TTVPN.apk
+          name: CPvpn
+          path: app/build/outputs/apk/release/CPvpn.apk
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: TTVPN Build ${{ github.run_number }}
+          name: CPvpn Build ${{ github.run_number }}
           body: |
             Automated build from commit ${{ github.sha }} on branch ${{ github.ref_name }}.
             Triggered by ${{ github.actor }}.
           files: |
-            app/build/outputs/apk/release/TTVPN.apk
+            app/build/outputs/apk/release/CPvpn.apk
             version.json
           draft: false
           prerelease: false
