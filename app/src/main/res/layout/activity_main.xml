@@ -44,18 +44,16 @@
                     android:layout_height="wrap_content"
                     android:text="CP"
                     android:textColor="#FF3399"
-                    android:fontFamily="@font/orbitron"
-                    android:textSize="20sp"
-                    android:textStyle="italic" />
+                    android:fontFamily="@font/orbitron_italic"
+                    android:textSize="20sp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="vpn"
                     android:textColor="#00C9A7"
-                    android:fontFamily="@font/orbitron"
-                    android:textSize="20sp"
-                    android:textStyle="italic" />
+                    android:fontFamily="@font/orbitron_italic"
+                    android:textSize="20sp" />
             </LinearLayout>
         </LinearLayout>
 
