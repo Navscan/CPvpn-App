@@ -59,6 +59,7 @@ object ApiClient {
 
     fun provisionConfig(token: String): RegisterResult {
         return try {
+            // This MUST use the full URL with https://
             val url = URL(Config.ENDPOINT_PROVISION)
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
