@@ -8,7 +8,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 sealed class AuthResult {
-    data class Success(val token: String, val tier: String) : AuthResult()
+    // ADDED isActive back to the Success state
+    data class Success(val token: String, val tier: String, val isActive: Boolean) : AuthResult()
     data class Failure(val error: String) : AuthResult()
     object NetworkError : AuthResult()
 }
@@ -17,7 +18,6 @@ object AuthClient {
 
     private fun postAuth(endpoint: String, jsonBody: String): AuthResult {
         return try {
-            // FIXED: Removed the extra /api from the URL construction
             val url = URL(Config.BASE_URL + endpoint)
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
@@ -44,7 +44,8 @@ object AuthClient {
             if (responseCode in 200..299 && json.optBoolean("ok", false)) {
                 val token = json.getString("token")
                 val tier = json.optString("tier", "free")
-                AuthResult.Success(token, tier)
+                val isActive = json.optBoolean("is_active", true)
+                AuthResult.Success(token, tier, isActive)
             } else {
                 val error = json.optString("error", "unknown_error")
                 AuthResult.Failure(error)
@@ -72,7 +73,6 @@ object AuthClient {
 
     fun updateEmail(token: String, newEmail: String): AuthResult {
         return try {
-            // FIXED: Removed the extra /api from the URL construction
             val url = URL(Config.BASE_URL + "/auth/update-email")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "PUT"
@@ -100,7 +100,8 @@ object AuthClient {
             
             if (responseCode in 200..299 && json.optBoolean("ok", false)) {
                 val newToken = json.getString("token")
-                AuthResult.Success(newToken, "free")
+                val tier = json.optString("tier", "free")
+                AuthResult.Success(newToken, tier, true)
             } else {
                 val error = json.optString("error", "unknown_error")
                 AuthResult.Failure(error)
@@ -111,7 +112,6 @@ object AuthClient {
         }
     }
 
-    // FIXED: Renamed back to checkLicense so MainActivity can find it
     fun checkLicense(token: String): AuthResult {
         return try {
             val url = URL(Config.BASE_URL + Config.ENDPOINT_AUTH_ME)
@@ -133,7 +133,8 @@ object AuthClient {
             
             if (responseCode in 200..299 && json.optBoolean("ok", false)) {
                 val tier = json.optString("tier", "free")
-                AuthResult.Success(token, tier)
+                val isActive = json.optBoolean("is_active", true)
+                AuthResult.Success(token, tier, isActive)
             } else {
                 AuthResult.Failure("session_expired")
             }
