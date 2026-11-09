@@ -93,7 +93,7 @@ class MainActivity : AppCompatActivity() {
     private var hasPromptedForVoucher = false
     private var guestRegisterInFlight = false
     private var pendingRegisterCallback: (() -> Unit)? = null
-    private var forcedGuestReset = false // Prevents infinite loops if backend rejects guest
+    private var forcedGuestReset = false
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -240,7 +240,7 @@ class MainActivity : AppCompatActivity() {
         EventLog.init(this)
         EventLog.write(this, "EVENT", "App opened")
 
-        if (ConfigStore.getAuthToken(this) == null) {
+        if (ConfigStore.getAuthToken(this).isNullOrBlank()) {
             silentGuestRegister()
         }
 
@@ -380,7 +380,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkLicenseAndRefresh() {
-        val token = ConfigStore.getAuthToken(this) ?: return
+        val token = ConfigStore.getAuthToken(this)
+        if (token.isNullOrBlank()) return
+        
         executor.execute {
             val result = AuthClient.checkLicense(token)
             handler.post {
@@ -403,7 +405,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initiatePayment(plan: String) {
-        val token = ConfigStore.getAuthToken(this) ?: return
+        val token = ConfigStore.getAuthToken(this)
+        if (token.isNullOrBlank()) return
+        
         val currentEmail = ConfigStore.getUserEmail(this)
 
         if (currentEmail.endsWith("@cpvpn.local") || currentEmail.isBlank()) {
@@ -444,7 +448,9 @@ class MainActivity : AppCompatActivity() {
                     return@setPositiveButton
                 }
 
-                val token = ConfigStore.getAuthToken(this) ?: return@setPositiveButton
+                val token = ConfigStore.getAuthToken(this)
+                if (token.isNullOrBlank()) return@setPositiveButton
+                
                 executor.execute {
                     val updateResult = AuthClient.updateEmail(token, newEmail)
                     handler.post {
@@ -750,12 +756,9 @@ class MainActivity : AppCompatActivity() {
 
         val token = ConfigStore.getAuthToken(this)
 
-        // THE FIX: If token is null, silently register and try again.
-        // Do NOT throw the "Subscription Required" error for Open tier.
-        if (token == null) {
+        if (token.isNullOrBlank()) {
             EventLog.write(this, "INFO", "No token, registering guest...")
             silentGuestRegister {
-                // Once the guest is registered, try connecting again
                 onToggleTapped()
             }
             return
@@ -790,7 +793,6 @@ class MainActivity : AppCompatActivity() {
                         is RegisterResult.Failure -> {
                             EventLog.write(this, "ERR", "Provision failed: ${provResult.reason}")
                             
-                            // Handle the backend rejecting an Open (Free) tier token
                             if (provResult.reason.contains("subscription", ignoreCase = true)) {
                                 if (tier == "free" && !forcedGuestReset) {
                                     forcedGuestReset = true
@@ -953,7 +955,8 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val token = ConfigStore.getAuthToken(this) ?: return@setOnClickListener
+            val token = ConfigStore.getAuthToken(this)
+            if (token.isNullOrBlank()) return@setOnClickListener
 
             EventLog.write(this, "EVENT", "Voucher submitted  ${EventLog.maskVoucher(code)}")
 
@@ -1029,7 +1032,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun registerWithCode(code: String) {
         if (!isVoucherComplete(code)) return
-        val token = ConfigStore.getAuthToken(this) ?: return
+        val token = ConfigStore.getAuthToken(this)
+        if (token.isNullOrBlank()) return
 
         if (ConfigStore.isVpnRunning(this)) {
             VpnService.stop(this)
