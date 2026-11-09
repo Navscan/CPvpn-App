@@ -247,7 +247,7 @@ class MainActivity : AppCompatActivity() {
         handleIntent(intent)
     }
 
-    private fun silentGuestRegister() {
+    private fun silentGuestRegister(onComplete: (() -> Unit)? = null) {
         btnToggle.isEnabled = false
         btnToggle.text = "INITIALIZING..."
         executor.execute {
@@ -258,8 +258,11 @@ class MainActivity : AppCompatActivity() {
                 if (result is AuthResult.Success) {
                     ConfigStore.saveAuth(this, result.token, result.tier)
                     EventLog.write(this, "OK", "Guest session initialized")
+                } else {
+                    EventLog.write(this, "ERR", "Guest session failed")
                 }
                 refreshUi()
+                onComplete?.invoke()
             }
         }
     }
@@ -427,13 +430,7 @@ class MainActivity : AppCompatActivity() {
                             ConfigStore.saveUserEmail(this, newEmail)
                             initiatePayment(plan)
                         } else {
-                            // Show the ACTUAL error instead of the generic one
-                            val errMsg = when(updateResult) {
-                                is AuthResult.Failure -> updateResult.error
-                                AuthResult.NetworkError -> "Network Error (404 or timeout)"
-                                else -> "Unknown error"
-                            }
-                            showErrorDialog("Failed to update email: $errMsg")
+                            showErrorDialog("Failed to update email. It might already be in use.")
                         }
                     }
                 }
@@ -724,23 +721,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         val token = ConfigStore.getAuthToken(this)
-        val tier = ConfigStore.getUserTier(this)
 
+        // THE FIX: If token is null, silently register and try again. 
+        // Do NOT throw the "Subscription Required" error for Open tier.
         if (token == null) {
-            if (ConfigStore.hasConfig(this)) {
-                EventLog.write(this, "EVENT", "Connect tapped")
-                pendingStart = true
-                requestConsentThenStart()
-                return
-            } else {
-                AlertDialog.Builder(this)
-                    .setTitle("Subscription Required")
-                    .setMessage("Please upgrade to Pro or Enterprise to provision a VPN config.")
-                    .setPositiveButton("OK", null)
-                    .show()
-                return
+            EventLog.write(this, "INFO", "No token, registering guest...")
+            silentGuestRegister {
+                // Once the guest is registered, try connecting again
+                onToggleTapped()
             }
+            return
         }
+
+        val tier = ConfigStore.getUserTier(this)
 
         if (tier == "enterprise" && ConfigStore.getVoucherCode(this) == null) {
             showErrorDialog("No active voucher token found. Please tap Enterprise to enter your voucher.")
@@ -750,9 +743,6 @@ class MainActivity : AppCompatActivity() {
         btnToggle.isEnabled = false
         btnToggle.text = "CONNECTING..."
         EventLog.write(this, "EVENT", "Connect tapped")
-
-        // REMOVED: AuthClient.checkLicense block. 
-        // We now let the backend handle expiry checks inside /provision.
 
         if (!ConfigStore.hasConfig(this)) {
             EventLog.write(this, "INFO", "Provisioning VPN config...")
@@ -770,10 +760,10 @@ class MainActivity : AppCompatActivity() {
                         }
                         is RegisterResult.Failure -> {
                             EventLog.write(this, "ERR", "Provision failed: ${provResult.reason}")
-                            if (provResult.reason.contains("subscription_expired") || provResult.reason.contains("403")) {
+                            if (provResult.reason.contains("subscription_expired")) {
                                 AlertDialog.Builder(this)
-                                    .setTitle("Subscription Inactive")
-                                    .setMessage("Your free trial has expired. Please upgrade to Pro or Enterprise.")
+                                    .setTitle("Trial Expired")
+                                    .setMessage("Your 14-day free trial has ended. Please upgrade to Pro.")
                                     .setPositiveButton("OK", null)
                                     .show()
                             } else {
@@ -1078,7 +1068,7 @@ class MainActivity : AppCompatActivity() {
         "voucher_already_used" -> "This voucher has already been used."
         "subscription_inactive" -> "Subscription is inactive."
         "user_not_found" -> "User not found."
-        else -> "Unknown error: $reason"
+        else -> "Unknown error."
     }
 
     private fun refreshUi() {
