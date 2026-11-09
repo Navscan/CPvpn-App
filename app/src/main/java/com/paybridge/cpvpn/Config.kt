@@ -2,7 +2,7 @@ package com.paybridge.cpvpn
 
 object Config {
     // CRITICAL: The protocol (https://) must be here.
-    const val BASE_URL = "https://api.flipstack.store/cpvpn"
+    const val BASE_URL = "http://154.66.198.207:3100"
     
     const val ENDPOINT_REGISTER = "$BASE_URL/api/register"
     const val ENDPOINT_HEALTH = "$BASE_URL/api/health"
