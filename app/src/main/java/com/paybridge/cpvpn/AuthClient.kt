@@ -2,6 +2,8 @@ package com.paybridge.cpvpn
 
 import org.json.JSONObject
 import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -11,9 +13,47 @@ sealed class AuthResult {
     object NetworkError : AuthResult()
 }
 
-data class LicenseResult(val isActive: Boolean, val tier: String)
-
 object AuthClient {
+
+    private fun postAuth(endpoint: String, jsonBody: String): AuthResult {
+        return try {
+            // FIXED: Removed the extra /api from the URL construction
+            val url = URL(Config.BASE_URL + endpoint)
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                connectTimeout = Config.HTTP_CONNECT_TIMEOUT_MS
+                readTimeout = Config.HTTP_READ_TIMEOUT_MS
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("Accept", "application/json")
+            }
+
+            val writer = OutputStreamWriter(conn.outputStream)
+            writer.write(jsonBody)
+            writer.flush()
+            writer.close()
+
+            val responseCode = conn.responseCode
+            val inputStream = if (responseCode in 200..299) conn.inputStream else conn.errorStream
+            val reader = BufferedReader(InputStreamReader(inputStream))
+            val response = reader.readText()
+            reader.close()
+
+            val json = JSONObject(response)
+            
+            if (responseCode in 200..299 && json.optBoolean("ok", false)) {
+                val token = json.getString("token")
+                val tier = json.optString("tier", "free")
+                AuthResult.Success(token, tier)
+            } else {
+                val error = json.optString("error", "unknown_error")
+                AuthResult.Failure(error)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            AuthResult.NetworkError
+        }
+    }
 
     fun login(email: String, password: String): AuthResult {
         val body = JSONObject().put("email", email).put("password", password).toString()
@@ -32,7 +72,8 @@ object AuthClient {
 
     fun updateEmail(token: String, newEmail: String): AuthResult {
         return try {
-            val url = URL(Config.BASE_URL + "/api/auth/update-email")
+            // FIXED: Removed the extra /api from the URL construction
+            val url = URL(Config.BASE_URL + "/auth/update-email")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "PUT"
                 doOutput = true
@@ -42,78 +83,61 @@ object AuthClient {
                 setRequestProperty("Accept", "application/json")
                 setRequestProperty("Authorization", "Bearer $token")
             }
-            val body = JSONObject().put("new_email", newEmail).toString()
-            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
 
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            val response = stream?.bufferedReader()?.use(BufferedReader::readText).orEmpty()
-            conn.disconnect()
+            val body = JSONObject().put("new_email", newEmail).toString()
+            val writer = OutputStreamWriter(conn.outputStream)
+            writer.write(body)
+            writer.flush()
+            writer.close()
+
+            val responseCode = conn.responseCode
+            val inputStream = if (responseCode in 200..299) conn.inputStream else conn.errorStream
+            val reader = BufferedReader(InputStreamReader(inputStream))
+            val response = reader.readText()
+            reader.close()
 
             val json = JSONObject(response)
-            if (code in 200..299 && json.optBoolean("ok", false)) {
-                AuthResult.Success(json.getString("token"), "free")
+            
+            if (responseCode in 200..299 && json.optBoolean("ok", false)) {
+                val newToken = json.getString("token")
+                AuthResult.Success(newToken, "free") // Tier is updated in DB, app will refresh
             } else {
-                AuthResult.Failure(json.optString("error", "unknown_error"))
+                val error = json.optString("error", "unknown_error")
+                AuthResult.Failure(error)
             }
         } catch (e: Exception) {
+            e.printStackTrace()
             AuthResult.NetworkError
         }
     }
 
-    fun checkLicense(token: String): LicenseResult {
+    fun getMe(token: String): AuthResult {
         return try {
-            val url = URL(Config.ENDPOINT_AUTH_ME)
+            val url = URL(Config.BASE_URL + Config.ENDPOINT_AUTH_ME)
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
+                connectTimeout = Config.HTTP_CONNECT_TIMEOUT_MS
+                readTimeout = Config.HTTP_READ_TIMEOUT_MS
+                setRequestProperty("Accept", "application/json")
                 setRequestProperty("Authorization", "Bearer $token")
-                setRequestProperty("Accept", "application/json")
-                connectTimeout = Config.HTTP_CONNECT_TIMEOUT_MS
-                readTimeout = Config.HTTP_READ_TIMEOUT_MS
             }
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            val response = stream?.bufferedReader()?.use(BufferedReader::readText).orEmpty()
-            conn.disconnect()
 
-            if (code == 200) {
-                val json = JSONObject(response)
-                LicenseResult(
-                    isActive = json.optBoolean("ok", false) && json.optBoolean("is_active", false),
-                    tier = json.optString("tier", "free")
-                )
-            } else {
-                LicenseResult(false, "free")
-            }
-        } catch (e: Exception) {
-            LicenseResult(false, "free")
-        }
-    }
-
-    private fun postAuth(endpoint: String, body: String): AuthResult {
-        return try {
-            val url = URL(endpoint)
-            val conn = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                doOutput = true
-                connectTimeout = Config.HTTP_CONNECT_TIMEOUT_MS
-                readTimeout = Config.HTTP_READ_TIMEOUT_MS
-                setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                setRequestProperty("Accept", "application/json")
-            }
-            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            val response = stream?.bufferedReader()?.use(BufferedReader::readText).orEmpty()
-            conn.disconnect()
+            val responseCode = conn.responseCode
+            val inputStream = if (responseCode in 200..299) conn.inputStream else conn.errorStream
+            val reader = BufferedReader(InputStreamReader(inputStream))
+            val response = reader.readText()
+            reader.close()
 
             val json = JSONObject(response)
-            if (code in 200..299 && json.optBoolean("ok", false)) {
-                AuthResult.Success(json.getString("token"), json.optString("tier", "free"))
+            
+            if (responseCode in 200..299 && json.optBoolean("ok", false)) {
+                val tier = json.optString("tier", "free")
+                AuthResult.Success(token, tier)
             } else {
-                AuthResult.Failure(json.optString("error", "unknown_error"))
+                AuthResult.Failure("session_expired")
             }
         } catch (e: Exception) {
+            e.printStackTrace()
             AuthResult.NetworkError
         }
     }
