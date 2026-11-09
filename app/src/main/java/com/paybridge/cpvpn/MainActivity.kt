@@ -787,30 +787,32 @@ class MainActivity : AppCompatActivity() {
                             forcedGuestReset = false
                             ConfigStore.saveConfig(this, provResult.config, provResult.assignedIp, null)
                             EventLog.write(this, "OK", "VPN config provisioned")
+                            refreshUi()
                             pendingStart = true
                             requestConsentThenStart()
                         }
                         is RegisterResult.Failure -> {
                             EventLog.write(this, "ERR", "Provision failed: ${provResult.reason}")
+                            refreshUi() // Force UI update
                             
-                            // THE HARD RESET: If backend says subscription, wipe token and force Open tier
-                            if (provResult.reason.contains("subscription", ignoreCase = true) || provResult.reason.contains("inactive", ignoreCase = true)) {
-                                if (!forcedGuestReset) {
-                                    forcedGuestReset = true
-                                    EventLog.write(this, "WARN", "Subscription error. Forcing hard reset to Open Tier.")
-                                    ConfigStore.clearAuth(this)
-                                    silentGuestRegister {
-                                        onToggleTapped()
-                                    }
-                                } else {
-                                    showErrorDialog("Failed to provision. Backend rejected Open tier.")
+                            if (!forcedGuestReset) {
+                                forcedGuestReset = true
+                                EventLog.write(this, "WARN", "Provision failed. Wiping auth and forcing Guest.")
+                                ConfigStore.clearAuth(this)
+                                silentGuestRegister {
+                                    onToggleTapped()
                                 }
                             } else {
-                                showErrorDialog("Failed to get VPN config: ${provResult.reason}")
+                                AlertDialog.Builder(this)
+                                    .setTitle("Provisioning Error")
+                                    .setMessage("Backend rejected Open tier: ${provResult.reason}")
+                                    .setPositiveButton("OK", null)
+                                    .show()
                             }
                         }
                         RegisterResult.NetworkError -> {
                             EventLog.write(this, "ERR", "Provision network error")
+                            refreshUi() // Force UI update
                             showErrorDialog("Network error. Could not reach backend.")
                         }
                     }
