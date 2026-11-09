@@ -32,7 +32,8 @@ object AuthClient {
 
     fun updateEmail(token: String, newEmail: String): AuthResult {
         return try {
-            val url = URL(Config.BASE_URL + "/auth/update-email")
+            // FIXED: Added /api back to the URL
+            val url = URL(Config.BASE_URL + "/api/auth/update-email")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "PUT"
                 doOutput = true
@@ -63,7 +64,7 @@ object AuthClient {
 
     fun checkLicense(token: String): LicenseResult {
         return try {
-            val url = URL(Config.BASE_URL + Config.ENDPOINT_AUTH_ME)
+            val url = URL(Config.ENDPOINT_AUTH_ME)
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 setRequestProperty("Authorization", "Bearer $token")
@@ -92,7 +93,7 @@ object AuthClient {
 
     private fun postAuth(endpoint: String, body: String): AuthResult {
         return try {
-            val url = URL(Config.BASE_URL + endpoint)
+            val url = URL(endpoint)
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 doOutput = true

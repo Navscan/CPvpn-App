@@ -427,7 +427,13 @@ class MainActivity : AppCompatActivity() {
                             ConfigStore.saveUserEmail(this, newEmail)
                             initiatePayment(plan)
                         } else {
-                            showErrorDialog("Failed to update email. It might already be in use.")
+                            // Show the ACTUAL error instead of the generic one
+                            val errMsg = when(updateResult) {
+                                is AuthResult.Failure -> updateResult.error
+                                AuthResult.NetworkError -> "Network Error (404 or timeout)"
+                                else -> "Unknown error"
+                            }
+                            showErrorDialog("Failed to update email: $errMsg")
                         }
                     }
                 }
@@ -1072,7 +1078,7 @@ class MainActivity : AppCompatActivity() {
         "voucher_already_used" -> "This voucher has already been used."
         "subscription_inactive" -> "Subscription is inactive."
         "user_not_found" -> "User not found."
-        else -> "Unknown error."
+        else -> "Unknown error: $reason"
     }
 
     private fun refreshUi() {
