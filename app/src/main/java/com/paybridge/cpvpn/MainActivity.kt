@@ -793,20 +793,17 @@ class MainActivity : AppCompatActivity() {
                         is RegisterResult.Failure -> {
                             EventLog.write(this, "ERR", "Provision failed: ${provResult.reason}")
                             
-                            if (provResult.reason.contains("subscription", ignoreCase = true)) {
-                                if (tier == "free" && !forcedGuestReset) {
+                            // THE HARD RESET: If backend says subscription, wipe token and force Open tier
+                            if (provResult.reason.contains("subscription", ignoreCase = true) || provResult.reason.contains("inactive", ignoreCase = true)) {
+                                if (!forcedGuestReset) {
                                     forcedGuestReset = true
-                                    EventLog.write(this, "WARN", "Backend rejected guest token. Resetting to Guest...")
+                                    EventLog.write(this, "WARN", "Subscription error. Forcing hard reset to Open Tier.")
                                     ConfigStore.clearAuth(this)
                                     silentGuestRegister {
                                         onToggleTapped()
                                     }
                                 } else {
-                                    AlertDialog.Builder(this)
-                                        .setTitle("Subscription Required")
-                                        .setMessage("Please upgrade to Pro or Enterprise to provision a VPN config.")
-                                        .setPositiveButton("OK", null)
-                                        .show()
+                                    showErrorDialog("Failed to provision. Backend rejected Open tier.")
                                 }
                             } else {
                                 showErrorDialog("Failed to get VPN config: ${provResult.reason}")
