@@ -745,53 +745,48 @@ class MainActivity : AppCompatActivity() {
         btnToggle.text = "CONNECTING..."
         EventLog.write(this, "EVENT", "Connect tapped")
 
-        executor.execute {
-            val result = AuthClient.checkLicense(token)
-            handler.post {
-                if (!result.isActive) {
+        // REMOVED: AuthClient.checkLicense block. 
+        // We now let the backend handle expiry checks inside /provision.
+
+        if (!ConfigStore.hasConfig(this)) {
+            EventLog.write(this, "INFO", "Provisioning VPN config...")
+            executor.execute {
+                val provResult = ApiClient.provisionConfig(token)
+                handler.post {
                     btnToggle.isEnabled = true
                     btnToggle.text = "CONNECT"
-                    AlertDialog.Builder(this)
-                        .setTitle("Subscription Inactive")
-                        .setMessage("Your subscription is not active. Please upgrade to Pro or Enterprise.")
-                        .setPositiveButton("OK", null)
-                        .show()
-                    return@post
-                }
-
-                if (!ConfigStore.hasConfig(this)) {
-                    EventLog.write(this, "INFO", "Provisioning VPN config...")
-                    executor.execute {
-                        val provResult = ApiClient.provisionConfig(token)
-                        handler.post {
-                            btnToggle.isEnabled = true
-                            btnToggle.text = "CONNECT"
-                            when (provResult) {
-                                is RegisterResult.Success -> {
-                                    ConfigStore.saveConfig(this, provResult.config, provResult.assignedIp, null)
-                                    EventLog.write(this, "OK", "VPN config provisioned")
-                                    pendingStart = true
-                                    requestConsentThenStart()
-                                }
-                                is RegisterResult.Failure -> {
-                                    EventLog.write(this, "ERR", "Provision failed: ${provResult.reason}")
-                                    showErrorDialog("Failed to get VPN config: ${provResult.reason}")
-                                }
-                                RegisterResult.NetworkError -> {
-                                    EventLog.write(this, "ERR", "Provision network error")
-                                    showErrorDialog("Network error. Could not reach backend.")
-                                }
+                    when (provResult) {
+                        is RegisterResult.Success -> {
+                            ConfigStore.saveConfig(this, provResult.config, provResult.assignedIp, null)
+                            EventLog.write(this, "OK", "VPN config provisioned")
+                            pendingStart = true
+                            requestConsentThenStart()
+                        }
+                        is RegisterResult.Failure -> {
+                            EventLog.write(this, "ERR", "Provision failed: ${provResult.reason}")
+                            if (provResult.reason.contains("subscription_expired") || provResult.reason.contains("403")) {
+                                AlertDialog.Builder(this)
+                                    .setTitle("Subscription Inactive")
+                                    .setMessage("Your free trial has expired. Please upgrade to Pro or Enterprise.")
+                                    .setPositiveButton("OK", null)
+                                    .show()
+                            } else {
+                                showErrorDialog("Failed to get VPN config: ${provResult.reason}")
                             }
                         }
+                        RegisterResult.NetworkError -> {
+                            EventLog.write(this, "ERR", "Provision network error")
+                            showErrorDialog("Network error. Could not reach backend.")
+                        }
                     }
-                    return@post
                 }
-
-                btnToggle.isEnabled = true
-                pendingStart = true
-                requestConsentThenStart()
             }
+            return
         }
+
+        btnToggle.isEnabled = true
+        pendingStart = true
+        requestConsentThenStart()
     }
 
     private fun requestConsentThenStart() {
@@ -927,7 +922,6 @@ class MainActivity : AppCompatActivity() {
             btnCancel.isEnabled = false
             txtError.visibility = View.GONE
 
-            // Stop VPN before provisioning to prevent network drop during API call
             if (ConfigStore.isVpnRunning(this)) {
                 VpnService.stop(this)
                 Thread.sleep(1000)
@@ -997,7 +991,6 @@ class MainActivity : AppCompatActivity() {
         if (!isVoucherComplete(code)) return
         val token = ConfigStore.getAuthToken(this) ?: return
         
-        // Stop VPN before provisioning to prevent network drop during API call
         if (ConfigStore.isVpnRunning(this)) {
             VpnService.stop(this)
             Thread.sleep(1000)
