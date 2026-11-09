@@ -93,6 +93,7 @@ class MainActivity : AppCompatActivity() {
     private var hasPromptedForVoucher = false
     private var guestRegisterInFlight = false
     private var pendingRegisterCallback: (() -> Unit)? = null
+    private var forcedGuestReset = false // Prevents infinite loops if backend rejects guest
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -780,6 +781,7 @@ class MainActivity : AppCompatActivity() {
                     btnToggle.text = "CONNECT"
                     when (provResult) {
                         is RegisterResult.Success -> {
+                            forcedGuestReset = false
                             ConfigStore.saveConfig(this, provResult.config, provResult.assignedIp, null)
                             EventLog.write(this, "OK", "VPN config provisioned")
                             pendingStart = true
@@ -787,12 +789,23 @@ class MainActivity : AppCompatActivity() {
                         }
                         is RegisterResult.Failure -> {
                             EventLog.write(this, "ERR", "Provision failed: ${provResult.reason}")
-                            if (provResult.reason.contains("subscription_expired")) {
-                                AlertDialog.Builder(this)
-                                    .setTitle("Trial Expired")
-                                    .setMessage("Your 14-day free trial has ended. Please upgrade to Pro.")
-                                    .setPositiveButton("OK", null)
-                                    .show()
+                            
+                            // Handle the backend rejecting an Open (Free) tier token
+                            if (provResult.reason.contains("subscription", ignoreCase = true)) {
+                                if (tier == "free" && !forcedGuestReset) {
+                                    forcedGuestReset = true
+                                    EventLog.write(this, "WARN", "Backend rejected guest token. Resetting to Guest...")
+                                    ConfigStore.clearAuth(this)
+                                    silentGuestRegister {
+                                        onToggleTapped()
+                                    }
+                                } else {
+                                    AlertDialog.Builder(this)
+                                        .setTitle("Subscription Required")
+                                        .setMessage("Please upgrade to Pro or Enterprise to provision a VPN config.")
+                                        .setPositiveButton("OK", null)
+                                        .show()
+                                }
                             } else {
                                 showErrorDialog("Failed to get VPN config: ${provResult.reason}")
                             }
