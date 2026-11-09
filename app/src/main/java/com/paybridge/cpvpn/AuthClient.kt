@@ -26,8 +26,81 @@ object AuthClient {
                 setRequestProperty("Content-Type", "application/json; charset=utf-8")
                 setRequestProperty("Accept", "application/json")
             }
-            // THE FIX: Change "deviceId" to "device_id" to match the backend
             val body = JSONObject().put("device_id", deviceId).toString()
+            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val response = stream?.bufferedReader()?.use(BufferedReader::readText).orEmpty()
+            conn.disconnect()
+
+            if (code in 200..299) {
+                val json = JSONObject(response)
+                if (json.optBoolean("ok", false)) {
+                    AuthResult.Success(
+                        token = json.getString("token"),
+                        tier = json.optString("tier", "free")
+                    )
+                } else {
+                    AuthResult.Failure(json.optString("error", "unknown"))
+                }
+            } else {
+                AuthResult.Failure("HTTP $code: $response")
+            }
+        } catch (e: Exception) {
+            AuthResult.NetworkError
+        }
+    }
+
+    fun login(email: String, password: String): AuthResult {
+        return try {
+            val url = URL(Config.ENDPOINT_AUTH_LOGIN)
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                connectTimeout = Config.HTTP_CONNECT_TIMEOUT_MS
+                readTimeout = Config.HTTP_READ_TIMEOUT_MS
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("Accept", "application/json")
+            }
+            val body = JSONObject().put("email", email).put("password", password).toString()
+            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val response = stream?.bufferedReader()?.use(BufferedReader::readText).orEmpty()
+            conn.disconnect()
+
+            if (code in 200..299) {
+                val json = JSONObject(response)
+                if (json.optBoolean("ok", false)) {
+                    AuthResult.Success(
+                        token = json.getString("token"),
+                        tier = json.optString("tier", "free")
+                    )
+                } else {
+                    AuthResult.Failure(json.optString("error", "unknown"))
+                }
+            } else {
+                AuthResult.Failure("HTTP $code: $response")
+            }
+        } catch (e: Exception) {
+            AuthResult.NetworkError
+        }
+    }
+
+    fun register(email: String, password: String): AuthResult {
+        return try {
+            val url = URL(Config.ENDPOINT_AUTH_REGISTER)
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                connectTimeout = Config.HTTP_CONNECT_TIMEOUT_MS
+                readTimeout = Config.HTTP_READ_TIMEOUT_MS
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("Accept", "application/json")
+            }
+            val body = JSONObject().put("email", email).put("password", password).toString()
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
 
             val code = conn.responseCode
