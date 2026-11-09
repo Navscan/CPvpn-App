@@ -15,17 +15,13 @@
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
         android:paddingTop="10dp"
-        android:paddingBottom="10dp"
-        android:clipChildren="false"
-        android:clipToPadding="false">
+        android:paddingBottom="10dp">
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:orientation="vertical"
-            android:clipChildren="false"
-            android:clipToPadding="false">
+            android:orientation="vertical">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -37,40 +33,15 @@
                 android:letterSpacing="0.15"
                 android:textStyle="bold" />
 
-            <LinearLayout
+            <!-- THE NEW IMAGE LOGO -->
+            <ImageView
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="2dp"
-                android:clipChildren="false"
-                android:clipToPadding="false">
-
-                <!-- Added paddingStart and paddingEnd to widen the bounding box -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="CP"
-                    android:textColor="#FF3399"
-                    android:fontFamily="@font/orbitron_black"
-                    android:textSize="20sp"
-                    android:textStyle="bold|italic"
-                    android:paddingStart="2dp"
-                    android:paddingEnd="6dp"
-                    android:clipChildren="false"
-                    android:clipToPadding="false" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="vpn"
-                    android:textColor="#00C9A7"
-                    android:fontFamily="@font/orbitron_black"
-                    android:textSize="20sp"
-                    android:textStyle="bold|italic"
-                    android:paddingEnd="12dp"
-                    android:clipChildren="false"
-                    android:clipToPadding="false" />
-            </LinearLayout>
+                android:layout_height="24dp"
+                android:layout_marginTop="4dp"
+                android:src="@drawable/cpvpn_logo"
+                android:adjustViewBounds="true"
+                android:scaleType="fitStart" />
+                
         </LinearLayout>
 
         <TextView
