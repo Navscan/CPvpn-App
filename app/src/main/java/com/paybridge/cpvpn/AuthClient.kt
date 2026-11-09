@@ -100,7 +100,7 @@ object AuthClient {
             
             if (responseCode in 200..299 && json.optBoolean("ok", false)) {
                 val newToken = json.getString("token")
-                AuthResult.Success(newToken, "free") // Tier is updated in DB, app will refresh
+                AuthResult.Success(newToken, "free")
             } else {
                 val error = json.optString("error", "unknown_error")
                 AuthResult.Failure(error)
@@ -111,7 +111,8 @@ object AuthClient {
         }
     }
 
-    fun getMe(token: String): AuthResult {
+    // FIXED: Renamed back to checkLicense so MainActivity can find it
+    fun checkLicense(token: String): AuthResult {
         return try {
             val url = URL(Config.BASE_URL + Config.ENDPOINT_AUTH_ME)
             val conn = (url.openConnection() as HttpURLConnection).apply {
