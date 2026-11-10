@@ -380,6 +380,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initiatePayment(plan: String) {
+        // Stop VPN before processing payment to ensure network is stable
+        if (ConfigStore.isVpnRunning(this)) {
+            VpnService.stop(this)
+            EventLog.write(this, "EVENT", "VPN paused for payment")
+        }
+
         val token = ConfigStore.getAuthToken(this) ?: return
         val currentEmail = ConfigStore.getUserEmail(this)
         
@@ -421,6 +427,11 @@ class MainActivity : AppCompatActivity() {
                     return@setPositiveButton
                 }
                 
+                // Stop VPN before updating email
+                if (ConfigStore.isVpnRunning(this)) {
+                    VpnService.stop(this)
+                }
+
                 val token = ConfigStore.getAuthToken(this) ?: return@setPositiveButton
                 executor.execute {
                     val updateResult = AuthClient.updateEmail(token, newEmail)
@@ -722,12 +733,9 @@ class MainActivity : AppCompatActivity() {
 
         val token = ConfigStore.getAuthToken(this)
 
-        // THE FIX: If token is null, silently register and try again. 
-        // Do NOT throw the "Subscription Required" error for Open tier.
         if (token == null) {
             EventLog.write(this, "INFO", "No token, registering guest...")
             silentGuestRegister {
-                // Once the guest is registered, try connecting again
                 onToggleTapped()
             }
             return
