@@ -380,12 +380,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initiatePayment(plan: String) {
-        // Stop VPN before processing payment to ensure network is stable
-        if (ConfigStore.isVpnRunning(this)) {
-            VpnService.stop(this)
-            EventLog.write(this, "EVENT", "VPN paused for payment")
-        }
-
         val token = ConfigStore.getAuthToken(this) ?: return
         val currentEmail = ConfigStore.getUserEmail(this)
         
@@ -427,21 +421,25 @@ class MainActivity : AppCompatActivity() {
                     return@setPositiveButton
                 }
                 
-                // Stop VPN before updating email
                 if (ConfigStore.isVpnRunning(this)) {
                     VpnService.stop(this)
+                    EventLog.write(this, "EVENT", "VPN paused for payment")
                 }
 
                 val token = ConfigStore.getAuthToken(this) ?: return@setPositiveButton
                 executor.execute {
+                    // ADD A 1.5 SECOND DELAY to let the network interface recover
+                    Thread.sleep(1500) 
                     val updateResult = AuthClient.updateEmail(token, newEmail)
                     handler.post {
                         if (updateResult is AuthResult.Success) {
                             ConfigStore.saveAuth(this, updateResult.token, "free")
                             ConfigStore.saveUserEmail(this, newEmail)
                             initiatePayment(plan)
+                        } else if (updateResult is AuthResult.Failure) {
+                            showErrorDialog("Failed to update email: ${updateResult.error}")
                         } else {
-                            showErrorDialog("Failed to update email. It might already be in use.")
+                            showErrorDialog("Network error. Please check your connection and try again.")
                         }
                     }
                 }
