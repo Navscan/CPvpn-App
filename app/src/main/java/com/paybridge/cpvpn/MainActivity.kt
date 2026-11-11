@@ -90,7 +90,9 @@ class MainActivity : AppCompatActivity() {
     private var lastLogFingerprint: String = ""
     private var logUserScrolledAway: Boolean = false
     private var isThreatTabActive = false
-    private var hasPromptedForVoucher = false
+    private var guestRegisterInFlight = false
+    private var pendingRegisterCallback: (() -> Unit)? = null
+    private var forcedGuestReset = false
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -175,12 +177,12 @@ class MainActivity : AppCompatActivity() {
         btnOpenThreatCentre.setOnClickListener {
             startActivity(Intent(this, ThreatCentreActivity::class.java))
         }
-        
+
         btnExit.setOnClickListener { finishAffinity() }
 
         btnLogout.setOnClickListener {
             VpnService.stop(this)
-            ConfigStore.clearAuth(this) 
+            ConfigStore.clearAuth(this)
             finishAffinity()
         }
 
@@ -236,8 +238,8 @@ class MainActivity : AppCompatActivity() {
         cleanupAfterInstall()
         EventLog.init(this)
         EventLog.write(this, "EVENT", "App opened")
-        
-        if (ConfigStore.getAuthToken(this) == null) {
+
+        if (ConfigStore.getAuthToken(this).isNullOrBlank()) {
             silentGuestRegister()
         }
 
@@ -248,21 +250,41 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun silentGuestRegister(onComplete: (() -> Unit)? = null) {
+        if (guestRegisterInFlight) {
+            if (onComplete != null) pendingRegisterCallback = onComplete
+            return
+        }
+        guestRegisterInFlight = true
         btnToggle.isEnabled = false
         btnToggle.text = "INITIALIZING..."
         executor.execute {
-            val deviceId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: UUID.randomUUID().toString()
+            val deviceId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+                ?: UUID.randomUUID().toString()
             val result = AuthClient.guestLogin(deviceId)
             handler.post {
+                guestRegisterInFlight = false
                 btnToggle.isEnabled = true
-                if (result is AuthResult.Success) {
-                    ConfigStore.saveAuth(this, result.token, result.tier)
-                    EventLog.write(this, "OK", "Guest session initialized")
-                } else {
-                    EventLog.write(this, "ERR", "Guest session failed")
+                val queued = pendingRegisterCallback
+                pendingRegisterCallback = null
+                when (result) {
+                    is AuthResult.Success -> {
+                        ConfigStore.saveAuth(this, result.token, result.tier)
+                        EventLog.write(this, "OK", "Guest session initialized")
+                        refreshUi()
+                        onComplete?.invoke()
+                        queued?.invoke()
+                    }
+                    is AuthResult.Failure -> {
+                        EventLog.write(this, "ERR", "Guest session failed: ${result.error}")
+                        refreshUi()
+                        showErrorDialog("Could not start Open tier session. ${result.error}")
+                    }
+                    AuthResult.NetworkError -> {
+                        EventLog.write(this, "ERR", "Guest session failed: network error")
+                        refreshUi()
+                        showErrorDialog("Network error. Please check your connection and try again.")
+                    }
                 }
-                refreshUi()
-                onComplete?.invoke()
             }
         }
     }
@@ -280,17 +302,20 @@ class MainActivity : AppCompatActivity() {
                     .setPositiveButton("OK", null)
                     .show()
             }
-            tier == "enterprise" || !isGuest -> {
+            tier == "enterprise" -> {
                 val savedVoucher = ConfigStore.getVoucherCode(this)
                 showVoucherDialog(savedVoucher)
             }
             else -> {
+                // FREE OR GUEST: Give them the explicit choice
                 val options = arrayOf("Login as Enterprise User", "Upgrade to Pro")
                 AlertDialog.Builder(this)
                     .setTitle("Open Tier")
                     .setItems(options) { _, which ->
                         if (which == 0) {
-                            startActivity(Intent(this, LoginActivity::class.java))
+                            // They explicitly want Enterprise, so prompt for voucher
+                            hasPromptedForVoucher = true
+                            showVoucherDialog(null)
                         } else {
                             showUpgradeDialog()
                         }
@@ -328,16 +353,8 @@ class MainActivity : AppCompatActivity() {
         handler.post(pollRunnable)
         maybeCheckForUpdate()
 
-        val email = ConfigStore.getUserEmail(this)
-        val tier = ConfigStore.getUserTier(this)
-        val isGuest = email.endsWith("@cpvpn.local") || email.isBlank()
-
-        if (!isGuest && tier == "free" && ConfigStore.getVoucherCode(this) == null && !hasPromptedForVoucher) {
-            hasPromptedForVoucher = true
-            showVoucherDialog(null)
-        } else {
-            checkLicenseAndRefresh()
-        }
+        // Always check the license on resume. Do NOT auto-prompt for a voucher here!
+        checkLicenseAndRefresh()
     }
 
     override fun onPause() {
@@ -357,7 +374,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkLicenseAndRefresh() {
-        val token = ConfigStore.getAuthToken(this) ?: return
+        val token = ConfigStore.getAuthToken(this)
+        if (token.isNullOrBlank()) return
+        
         executor.execute {
             val result = AuthClient.checkLicense(token)
             handler.post {
@@ -380,9 +399,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initiatePayment(plan: String) {
-        val token = ConfigStore.getAuthToken(this) ?: return
-        val currentEmail = ConfigStore.getUserEmail(this)
+        val token = ConfigStore.getAuthToken(this)
+        if (token.isNullOrBlank()) return
         
+        val currentEmail = ConfigStore.getUserEmail(this)
+
         if (currentEmail.endsWith("@cpvpn.local") || currentEmail.isBlank()) {
             promptForEmail(plan)
             return
@@ -409,7 +430,7 @@ class MainActivity : AppCompatActivity() {
             hint = "you@example.com"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
         }
-        
+
         AlertDialog.Builder(this)
             .setTitle("Enter Email Address")
             .setMessage("Please enter your email address to receive your Pro receipt and manage your account.")
@@ -420,26 +441,19 @@ class MainActivity : AppCompatActivity() {
                     showErrorDialog("Please enter a valid email address.")
                     return@setPositiveButton
                 }
-                
-                if (ConfigStore.isVpnRunning(this)) {
-                    VpnService.stop(this)
-                    EventLog.write(this, "EVENT", "VPN paused for payment")
-                }
 
-                val token = ConfigStore.getAuthToken(this) ?: return@setPositiveButton
+                val token = ConfigStore.getAuthToken(this)
+                if (token.isNullOrBlank()) return@setPositiveButton
+                
                 executor.execute {
-                    // ADD A 1.5 SECOND DELAY to let the network interface recover
-                    Thread.sleep(1500) 
                     val updateResult = AuthClient.updateEmail(token, newEmail)
                     handler.post {
                         if (updateResult is AuthResult.Success) {
                             ConfigStore.saveAuth(this, updateResult.token, "free")
                             ConfigStore.saveUserEmail(this, newEmail)
                             initiatePayment(plan)
-                        } else if (updateResult is AuthResult.Failure) {
-                            showErrorDialog("Failed to update email: ${updateResult.error}")
                         } else {
-                            showErrorDialog("Network error. Please check your connection and try again.")
+                            showErrorDialog("Failed to update email. It might already be in use.")
                         }
                     }
                 }
@@ -635,6 +649,7 @@ class MainActivity : AppCompatActivity() {
     private fun renderLogPanel(force: Boolean = false) {
         val entries = EventLog.readAll(this)
         val fingerprint = "${entries.size}:${entries.lastOrNull()?.timestamp.orEmpty()}"
+
         if (!force && fingerprint == lastLogFingerprint) return
         lastLogFingerprint = fingerprint
 
@@ -657,6 +672,7 @@ class MainActivity : AppCompatActivity() {
                     orientation = LinearLayout.HORIZONTAL
                     setPadding(0, padV, 0, padV)
                 }
+
                 val time = TextView(this).apply {
                     text = entry.timestamp
                     setTextColor(Color.parseColor("#5a6f82"))
@@ -664,6 +680,7 @@ class MainActivity : AppCompatActivity() {
                     textSize = 10f
                     layoutParams = LinearLayout.LayoutParams((60 * density).toInt(), LinearLayout.LayoutParams.WRAP_CONTENT)
                 }
+
                 val tag = TextView(this).apply {
                     text = entry.tag
                     setTextColor(tagColourFor(entry.tag))
@@ -671,6 +688,7 @@ class MainActivity : AppCompatActivity() {
                     textSize = 10f
                     layoutParams = LinearLayout.LayoutParams((48 * density).toInt(), LinearLayout.LayoutParams.WRAP_CONTENT)
                 }
+
                 val msg = TextView(this).apply {
                     text = entry.message
                     setTextColor(Color.parseColor("#c8d0e0"))
@@ -680,6 +698,7 @@ class MainActivity : AppCompatActivity() {
                     maxLines = 2
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 }
+
                 row.addView(time)
                 row.addView(tag)
                 row.addView(msg)
@@ -731,7 +750,7 @@ class MainActivity : AppCompatActivity() {
 
         val token = ConfigStore.getAuthToken(this)
 
-        if (token == null) {
+        if (token.isNullOrBlank()) {
             EventLog.write(this, "INFO", "No token, registering guest...")
             silentGuestRegister {
                 onToggleTapped()
@@ -759,25 +778,35 @@ class MainActivity : AppCompatActivity() {
                     btnToggle.text = "CONNECT"
                     when (provResult) {
                         is RegisterResult.Success -> {
+                            forcedGuestReset = false
                             ConfigStore.saveConfig(this, provResult.config, provResult.assignedIp, null)
                             EventLog.write(this, "OK", "VPN config provisioned")
+                            refreshUi()
                             pendingStart = true
                             requestConsentThenStart()
                         }
                         is RegisterResult.Failure -> {
                             EventLog.write(this, "ERR", "Provision failed: ${provResult.reason}")
-                            if (provResult.reason.contains("subscription_expired")) {
+                            refreshUi() // Force UI update
+                            
+                            if (!forcedGuestReset) {
+                                forcedGuestReset = true
+                                EventLog.write(this, "WARN", "Provision failed. Wiping auth and forcing Guest.")
+                                ConfigStore.clearAuth(this)
+                                silentGuestRegister {
+                                    onToggleTapped()
+                                }
+                            } else {
                                 AlertDialog.Builder(this)
-                                    .setTitle("Trial Expired")
-                                    .setMessage("Your 14-day free trial has ended. Please upgrade to Pro.")
+                                    .setTitle("Provisioning Error")
+                                    .setMessage("Backend rejected Open tier: ${provResult.reason}")
                                     .setPositiveButton("OK", null)
                                     .show()
-                            } else {
-                                showErrorDialog("Failed to get VPN config: ${provResult.reason}")
                             }
                         }
                         RegisterResult.NetworkError -> {
                             EventLog.write(this, "ERR", "Provision network error")
+                            refreshUi() // Force UI update
                             showErrorDialog("Network error. Could not reach backend.")
                         }
                     }
@@ -866,6 +895,7 @@ class MainActivity : AppCompatActivity() {
         val wasRunning = ConfigStore.isVpnRunning(this)
         if (!ConfigStore.setCustomDns(this, dns)) return
         EventLog.write(this, "EVENT", if (dns.isNullOrBlank()) "DNS reset" else "DNS set to $dns")
+
         if (wasRunning) {
             VpnService.stop(this)
             handler.postDelayed({
@@ -873,6 +903,7 @@ class MainActivity : AppCompatActivity() {
                 requestConsentThenStart()
             }, Config.DNS_RESTART_DELAY_MS)
         }
+
         refreshUi()
     }
 
@@ -908,7 +939,7 @@ class MainActivity : AppCompatActivity() {
             .create()
 
         btnCancel.setOnClickListener { dialog.dismiss() }
-        
+
         btnSubmit.setOnClickListener {
             val code = editVoucher.text.toString().trim()
             if (!isVoucherComplete(code)) {
@@ -917,7 +948,9 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val token = ConfigStore.getAuthToken(this) ?: return@setOnClickListener
+            val token = ConfigStore.getAuthToken(this)
+            if (token.isNullOrBlank()) return@setOnClickListener
+
             EventLog.write(this, "EVENT", "Voucher submitted  ${EventLog.maskVoucher(code)}")
 
             btnSubmit.isEnabled = false
@@ -939,7 +972,7 @@ class MainActivity : AppCompatActivity() {
                             txtError.text = "Provisioning VPN..."
                             txtError.setTextColor(Color.parseColor("#f5c842"))
                             txtError.visibility = View.VISIBLE
-                            
+
                             executor.execute {
                                 val provResult = ApiClient.provisionConfig(token)
                                 handler.post {
@@ -986,13 +1019,15 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
         dialog.show()
     }
 
     private fun registerWithCode(code: String) {
         if (!isVoucherComplete(code)) return
-        val token = ConfigStore.getAuthToken(this) ?: return
-        
+        val token = ConfigStore.getAuthToken(this)
+        if (token.isNullOrBlank()) return
+
         if (ConfigStore.isVpnRunning(this)) {
             VpnService.stop(this)
             Thread.sleep(1000)
@@ -1109,7 +1144,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             cardUpgrade.visibility = View.GONE
         }
-        
+
         if (tier != "enterprise") {
             tabThreat.visibility = View.GONE
             if (isThreatTabActive) switchTab(false)
