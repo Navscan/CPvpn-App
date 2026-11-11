@@ -450,7 +450,9 @@ class MainActivity : AppCompatActivity() {
                             ConfigStore.saveUserEmail(this, newEmail)
                             initiatePayment(plan)
                         } else {
-                            showErrorDialog("Failed to update email. It might already be in use.")
+                            // FIX: Show the ACTUAL error from the backend
+                            val realError = if (updateResult is AuthResult.Failure) updateResult.error else "Network Error"
+                            showErrorDialog("Failed to update email: $realError")
                         }
                     }
                 }
