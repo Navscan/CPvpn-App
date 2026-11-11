@@ -37,10 +37,7 @@ object AuthClient {
             if (code in 200..299) {
                 val json = JSONObject(response)
                 if (json.optBoolean("ok", false)) {
-                    AuthResult.Success(
-                        token = json.getString("token"),
-                        tier = json.optString("tier", "free")
-                    )
+                    AuthResult.Success(json.getString("token"), json.optString("tier", "free"))
                 } else {
                     AuthResult.Failure(json.optString("error", "unknown"))
                 }
@@ -74,10 +71,7 @@ object AuthClient {
             if (code in 200..299) {
                 val json = JSONObject(response)
                 if (json.optBoolean("ok", false)) {
-                    AuthResult.Success(
-                        token = json.getString("token"),
-                        tier = json.optString("tier", "free")
-                    )
+                    AuthResult.Success(json.getString("token"), json.optString("tier", "free"))
                 } else {
                     AuthResult.Failure(json.optString("error", "unknown"))
                 }
@@ -111,10 +105,7 @@ object AuthClient {
             if (code in 200..299) {
                 val json = JSONObject(response)
                 if (json.optBoolean("ok", false)) {
-                    AuthResult.Success(
-                        token = json.getString("token"),
-                        tier = json.optString("tier", "free")
-                    )
+                    AuthResult.Success(json.getString("token"), json.optString("tier", "free"))
                 } else {
                     AuthResult.Failure(json.optString("error", "unknown"))
                 }
@@ -130,7 +121,7 @@ object AuthClient {
         return try {
             val url = URL(Config.BASE_URL + "/api/auth/update-email")
             val conn = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "PUT" // FIX: Changed from POST to PUT
+                requestMethod = "PUT"
                 doOutput = true
                 connectTimeout = Config.HTTP_CONNECT_TIMEOUT_MS
                 readTimeout = Config.HTTP_READ_TIMEOUT_MS
@@ -138,7 +129,6 @@ object AuthClient {
                 setRequestProperty("Accept", "application/json")
                 setRequestProperty("Authorization", "Bearer $token")
             }
-            // FIX: Changed key from "newEmail" to "new_email"
             val body = JSONObject().put("new_email", newEmail).toString()
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
 
@@ -150,10 +140,7 @@ object AuthClient {
             if (code in 200..299) {
                 val json = JSONObject(response)
                 if (json.optBoolean("ok", false)) {
-                    AuthResult.Success(
-                        token = json.getString("token"),
-                        tier = "free" // Backend doesn't return tier here, fallback to free
-                    )
+                    AuthResult.Success(json.getString("token"), "free")
                 } else {
                     AuthResult.Failure(json.optString("error", "unknown"))
                 }
@@ -167,7 +154,8 @@ object AuthClient {
 
     fun checkLicense(token: String): LicenseResult {
         return try {
-            val url = URL(Config.BASE_URL + "/api/license/me")
+            // FIX: Changed from /api/license/me to /api/auth/me to match the backend route
+            val url = URL(Config.ENDPOINT_AUTH_ME)
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = Config.HTTP_CONNECT_TIMEOUT_MS

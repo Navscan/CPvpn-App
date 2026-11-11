@@ -384,6 +384,7 @@ class MainActivity : AppCompatActivity() {
             val result = AuthClient.checkLicense(token)
             handler.post {
                 if (result.isActive) {
+                    EventLog.write(this, "OK", "License synced: ${result.tier}")
                     ConfigStore.saveAuth(this, token, result.tier)
                     refreshUi()
                 }
