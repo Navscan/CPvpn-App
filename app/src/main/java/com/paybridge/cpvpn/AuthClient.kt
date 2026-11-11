@@ -130,7 +130,7 @@ object AuthClient {
         return try {
             val url = URL(Config.BASE_URL + "/api/auth/update-email")
             val conn = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
+                requestMethod = "PUT" // FIX: Changed from POST to PUT
                 doOutput = true
                 connectTimeout = Config.HTTP_CONNECT_TIMEOUT_MS
                 readTimeout = Config.HTTP_READ_TIMEOUT_MS
@@ -138,7 +138,8 @@ object AuthClient {
                 setRequestProperty("Accept", "application/json")
                 setRequestProperty("Authorization", "Bearer $token")
             }
-            val body = JSONObject().put("newEmail", newEmail).toString()
+            // FIX: Changed key from "newEmail" to "new_email"
+            val body = JSONObject().put("new_email", newEmail).toString()
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
 
             val code = conn.responseCode
@@ -151,7 +152,7 @@ object AuthClient {
                 if (json.optBoolean("ok", false)) {
                     AuthResult.Success(
                         token = json.getString("token"),
-                        tier = json.optString("tier", "free")
+                        tier = "free" // Backend doesn't return tier here, fallback to free
                     )
                 } else {
                     AuthResult.Failure(json.optString("error", "unknown"))
