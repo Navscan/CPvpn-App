@@ -350,8 +350,14 @@ class MainActivity : AppCompatActivity() {
         handler.post(pollRunnable)
         maybeCheckForUpdate()
 
-        // Always check license on resume. No voucher prompts here.
         checkLicenseAndRefresh()
+
+        // Added a 3-second delay check in case Paystack webhook is slightly delayed
+        if (awaitingPayment) {
+            handler.postDelayed({ checkLicenseAndRefresh() }, 3000)
+            handler.postDelayed({ checkLicenseAndRefresh() }, 6000)
+            awaitingPayment = false
+        }
     }
 
     override fun onPause() {
@@ -450,7 +456,6 @@ class MainActivity : AppCompatActivity() {
                             ConfigStore.saveUserEmail(this, newEmail)
                             initiatePayment(plan)
                         } else {
-                            // FIX: Show the ACTUAL error from the backend
                             val realError = if (updateResult is AuthResult.Failure) updateResult.error else "Network Error"
                             showErrorDialog("Failed to update email: $realError")
                         }
@@ -1127,10 +1132,10 @@ class MainActivity : AppCompatActivity() {
             btnLogout.visibility = View.GONE
         }
 
+        // FIX: Do not default to Enterprise just because email is present
         btnTopRightStatus.text = when {
             tier == "enterprise" -> "Enterprise"
             tier == "pro" -> "Pro"
-            !isGuest -> "Enterprise"
             else -> "Open"
         }
 
@@ -1138,7 +1143,8 @@ class MainActivity : AppCompatActivity() {
         checkLock.isChecked = lockOn
         suppressLockChange = false
 
-        if (tier == "free" && isGuest) {
+        // FIX: Show upgrade card for any free user (guest or not)
+        if (tier == "free") {
             cardUpgrade.visibility = View.VISIBLE
         } else {
             cardUpgrade.visibility = View.GONE
