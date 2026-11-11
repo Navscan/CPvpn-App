@@ -307,14 +307,11 @@ class MainActivity : AppCompatActivity() {
                 showVoucherDialog(savedVoucher)
             }
             else -> {
-                // FREE OR GUEST: Give them the explicit choice
                 val options = arrayOf("Login as Enterprise User", "Upgrade to Pro")
                 AlertDialog.Builder(this)
                     .setTitle("Open Tier")
                     .setItems(options) { _, which ->
                         if (which == 0) {
-                            // They explicitly want Enterprise, so prompt for voucher
-                            hasPromptedForVoucher = true
                             showVoucherDialog(null)
                         } else {
                             showUpgradeDialog()
@@ -353,7 +350,7 @@ class MainActivity : AppCompatActivity() {
         handler.post(pollRunnable)
         maybeCheckForUpdate()
 
-        // Always check the license on resume. Do NOT auto-prompt for a voucher here!
+        // Always check license on resume. No voucher prompts here.
         checkLicenseAndRefresh()
     }
 
@@ -787,7 +784,7 @@ class MainActivity : AppCompatActivity() {
                         }
                         is RegisterResult.Failure -> {
                             EventLog.write(this, "ERR", "Provision failed: ${provResult.reason}")
-                            refreshUi() // Force UI update
+                            refreshUi()
                             
                             if (!forcedGuestReset) {
                                 forcedGuestReset = true
@@ -806,7 +803,7 @@ class MainActivity : AppCompatActivity() {
                         }
                         RegisterResult.NetworkError -> {
                             EventLog.write(this, "ERR", "Provision network error")
-                            refreshUi() // Force UI update
+                            refreshUi()
                             showErrorDialog("Network error. Could not reach backend.")
                         }
                     }
