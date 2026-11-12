@@ -352,7 +352,6 @@ class MainActivity : AppCompatActivity() {
 
         checkLicenseAndRefresh()
 
-        // Added a 3-second delay check in case Paystack webhook is slightly delayed
         if (awaitingPayment) {
             handler.postDelayed({ checkLicenseAndRefresh() }, 3000)
             handler.postDelayed({ checkLicenseAndRefresh() }, 6000)
@@ -384,8 +383,8 @@ class MainActivity : AppCompatActivity() {
             val result = AuthClient.checkLicense(token)
             handler.post {
                 if (result.isActive) {
-                    EventLog.write(this, "OK", "License synced: ${result.tier}")
                     ConfigStore.saveAuth(this, token, result.tier)
+                    EventLog.write(this, "OK", "License synced: ${result.tier}")
                     refreshUi()
                 }
             }
@@ -1108,13 +1107,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // UPDATED: Added real voucher error mappings
     private fun reasonToMessage(reason: String): String = when (reason) {
         "voucher_not_found" -> "Voucher not found."
         "voucher_bound_to_different_user" -> "This voucher belongs to a different email."
+        "voucher_already_claimed" -> "This voucher has already been claimed."
         "voucher_already_used" -> "This voucher has already been used."
         "subscription_inactive" -> "Subscription is inactive."
         "user_not_found" -> "User not found."
-        else -> "Unknown error."
+        else -> reason
     }
 
     private fun refreshUi() {
@@ -1133,7 +1134,6 @@ class MainActivity : AppCompatActivity() {
             btnLogout.visibility = View.GONE
         }
 
-        // FIX: Do not default to Enterprise just because email is present
         btnTopRightStatus.text = when {
             tier == "enterprise" -> "Enterprise"
             tier == "pro" -> "Pro"
@@ -1144,7 +1144,6 @@ class MainActivity : AppCompatActivity() {
         checkLock.isChecked = lockOn
         suppressLockChange = false
 
-        // FIX: Show upgrade card for any free user (guest or not)
         if (tier == "free") {
             cardUpgrade.visibility = View.VISIBLE
         } else {
