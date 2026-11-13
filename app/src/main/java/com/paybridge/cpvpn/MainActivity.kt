@@ -183,6 +183,10 @@ class MainActivity : AppCompatActivity() {
         btnLogout.setOnClickListener {
             VpnService.stop(this)
             ConfigStore.clearAuth(this)
+            // Explicitly flag that the user logged out so we don't auto-guest-register
+            val prefs = getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("explicit_logout", true).apply()
+            EventLog.write(this, "EVENT", "Logged out explicitly")
             finishAffinity()
         }
 
@@ -239,7 +243,10 @@ class MainActivity : AppCompatActivity() {
         EventLog.init(this)
         EventLog.write(this, "EVENT", "App opened")
 
-        if (ConfigStore.getAuthToken(this).isNullOrBlank()) {
+        val prefs = getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE)
+        val explicitlyLoggedOut = prefs.getBoolean("explicit_logout", false)
+
+        if (ConfigStore.getAuthToken(this).isNullOrBlank() && !explicitlyLoggedOut) {
             silentGuestRegister()
         }
 
@@ -269,6 +276,7 @@ class MainActivity : AppCompatActivity() {
                 when (result) {
                     is AuthResult.Success -> {
                         ConfigStore.saveAuth(this, result.token, result.tier)
+                        getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean("explicit_logout", false).apply()
                         EventLog.write(this, "OK", "Guest session initialized")
                         refreshUi()
                         onComplete?.invoke()
@@ -350,12 +358,18 @@ class MainActivity : AppCompatActivity() {
         handler.post(pollRunnable)
         maybeCheckForUpdate()
 
-        checkLicenseAndRefresh()
+        val prefs = getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE)
+        val explicitlyLoggedOut = prefs.getBoolean("explicit_logout", false)
+        
+        // Only check license if not explicitly logged out
+        if (!explicitlyLoggedOut) {
+            checkLicenseAndRefresh()
 
-        if (awaitingPayment) {
-            handler.postDelayed({ checkLicenseAndRefresh(force = true) }, 3000)
-            handler.postDelayed({ checkLicenseAndRefresh(force = true) }, 6000)
-            awaitingPayment = false
+            if (awaitingPayment) {
+                handler.postDelayed({ checkLicenseAndRefresh(force = true) }, 3000)
+                handler.postDelayed({ checkLicenseAndRefresh(force = true) }, 6000)
+                awaitingPayment = false
+            }
         }
     }
 
@@ -384,7 +398,6 @@ class MainActivity : AppCompatActivity() {
         val now = System.currentTimeMillis()
         val twentyFourHours = 24 * 60 * 60 * 1000L
 
-        // If not forced (e.g. from payment) and it's been less than 24 hours, skip the API call
         if (!force && (now - lastSync) < twentyFourHours) {
             return
         }
@@ -396,7 +409,6 @@ class MainActivity : AppCompatActivity() {
                     ConfigStore.saveAuth(this, token, result.tier)
                     EventLog.write(this, "OK", "License synced: ${result.tier}")
                     
-                    // Save the current time to throttle the next sync
                     prefs.edit().putLong("last_license_sync", now).apply()
                     
                     refreshUi()
@@ -926,24 +938,37 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showVoucherDialog(prefill: String?) {
-        val view = LayoutInflater.from(this).inflate(R.layout.voucher, null)
-        val editVoucher = view.findViewById<EditText>(R.id.editVoucher)
-        val txtError = view.findViewById<TextView>(R.id.txtError)
-        val btnCancel = view.findViewById<Button>(R.id.btnCancel)
-        val btnSubmit = view.findViewById<Button>(R.id.btnSubmit)
+        val density = resources.displayMetrics.density
+        val pad = (16 * density).toInt()
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, 0, pad, 0)
+        }
 
-        editVoucher.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                if (isFormattingVoucher) return
-                isFormattingVoucher = true
-                val formatted = formatVoucher(s?.toString().orEmpty())
-                editVoucher.setText(formatted)
-                editVoucher.setSelection(formatted.length)
-                isFormattingVoucher = false
-            }
-        })
+        val editEmail = EditText(this).apply {
+            hint = "client@company.com"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+            setTextColor(Color.parseColor("#e8edf5"))
+            setHintTextColor(Color.parseColor("#8a9bb0"))
+        }
+        
+        val editPassword = EditText(this).apply {
+            hint = "Password (if new, we'll create it)"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setTextColor(Color.parseColor("#e8edf5"))
+            setHintTextColor(Color.parseColor("#8a9bb0"))
+        }
+
+        val editVoucher = EditText(this).apply {
+            hint = "CPVPN-XXXX-XXXX-XXXX"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            setTextColor(Color.parseColor("#e8edf5"))
+            setHintTextColor(Color.parseColor("#8a9bb0"))
+        }
+
+        container.addView(editEmail)
+        container.addView(editPassword)
+        container.addView(editVoucher)
 
         val initial = prefill ?: ConfigStore.getVoucherCode(this) ?: readClipboardIfVoucher()
         if (!initial.isNullOrEmpty()) {
@@ -952,93 +977,96 @@ class MainActivity : AppCompatActivity() {
         }
 
         val dialog = AlertDialog.Builder(this)
-            .setView(view)
+            .setTitle("Enterprise Login")
+            .setMessage("Enter your client email, password, and voucher.")
+            .setView(container)
             .setCancelable(false)
             .create()
 
-        btnCancel.setOnClickListener { dialog.dismiss() }
-
-        btnSubmit.setOnClickListener {
+        dialog.setButton(AlertDialog.BUTTON_POSITIVE, "ACTIVATE") { _, _ ->
+            val email = editEmail.text.toString().trim()
+            val password = editPassword.text.toString().trim()
             val code = editVoucher.text.toString().trim()
+
+            if (email.isBlank() || !email.contains("@")) {
+                showErrorDialog("Please enter a valid email address.")
+                return@setButton
+            }
+            if (password.length < 8) {
+                showErrorDialog("Password must be at least 8 characters.")
+                return@setButton
+            }
             if (!isVoucherComplete(code)) {
-                txtError.text = "Please enter a valid 16-character code."
-                txtError.visibility = View.VISIBLE
-                return@setOnClickListener
+                showErrorDialog("Please enter a valid 16-character voucher code.")
+                return@setButton
             }
 
-            val token = ConfigStore.getAuthToken(this)
-            if (token.isNullOrBlank()) return@setOnClickListener
-
-            EventLog.write(this, "EVENT", "Voucher submitted  ${EventLog.maskVoucher(code)}")
-
-            btnSubmit.isEnabled = false
-            btnCancel.isEnabled = false
-            txtError.visibility = View.GONE
-
-            if (ConfigStore.isVpnRunning(this)) {
-                VpnService.stop(this)
-                Thread.sleep(1000)
-            }
-
+            // Process login/register and voucher redemption
             executor.execute {
-                val voucherResult = ApiClient.redeemVoucher(token, code)
-                handler.post {
-                    when (voucherResult) {
-                        is RegisterResult.Success -> {
-                            ConfigStore.saveVoucherCode(this, code)
-                            EventLog.write(this, "OK", "Voucher accepted")
-                            txtError.text = "Provisioning VPN..."
-                            txtError.setTextColor(Color.parseColor("#f5c842"))
-                            txtError.visibility = View.VISIBLE
+                // 1. Try to Login
+                var authResult = AuthClient.login(email, password)
+                
+                // 2. If failed, try to Register
+                if (authResult is AuthResult.Failure) {
+                    authResult = AuthClient.register(email, password)
+                }
 
-                            executor.execute {
-                                val provResult = ApiClient.provisionConfig(token)
-                                handler.post {
-                                    btnSubmit.isEnabled = true
-                                    btnCancel.isEnabled = true
-                                    txtError.visibility = View.GONE
-                                    when (provResult) {
-                                        is RegisterResult.Success -> {
-                                            ConfigStore.saveConfig(this, provResult.config, provResult.assignedIp, voucherResult.subscriptionExpiresAt)
-                                            EventLog.write(this, "OK", "VPN config provisioned")
-                                            dialog.dismiss()
-                                            pendingStart = true
-                                            requestConsentThenStart()
-                                        }
-                                        is RegisterResult.Failure -> {
-                                            EventLog.write(this, "ERR", "Provision failed: ${provResult.reason}")
-                                            txtError.text = "Voucher ok, but config failed: ${provResult.reason}"
-                                            txtError.visibility = View.VISIBLE
-                                        }
-                                        RegisterResult.NetworkError -> {
-                                            EventLog.write(this, "ERR", "Provision network error")
-                                            txtError.text = "Provision network error"
-                                            txtError.visibility = View.VISIBLE
-                                        }
-                                    }
-                                }
-                            }
+                if (authResult is AuthResult.Success) {
+                    val token = authResult.token
+                    // 3. Redeem the voucher using the new token
+                    val voucherResult = ApiClient.redeemVoucher(token, code)
+                    handler.post {
+                        if (voucherResult is RegisterResult.Success) {
+                            ConfigStore.saveAuth(this, token, "enterprise")
+                            ConfigStore.saveUserEmail(this, email)
+                            ConfigStore.saveVoucherCode(this, code)
+                            
+                            // Clear the explicit logout flag
+                            getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean("explicit_logout", false).apply()
+
+                            EventLog.write(this, "OK", "Voucher accepted. Welcome $email")
+                            dialog.dismiss()
+                            
+                            // Provision config immediately
+                            provisionAfterVoucher(token, voucherResult.subscriptionExpiresAt)
+                        } else {
+                            val realError = if (voucherResult is RegisterResult.Failure) voucherResult.reason else "Network Error"
+                            showErrorDialog("Voucher failed: $realError")
                         }
-                        is RegisterResult.Failure -> {
-                            EventLog.write(this, "ERR", "Voucher rejected  ${voucherResult.reason}")
-                            txtError.text = reasonToMessage(voucherResult.reason)
-                            txtError.visibility = View.VISIBLE
-                            btnSubmit.isEnabled = true
-                            btnCancel.isEnabled = true
-                        }
-                        RegisterResult.NetworkError -> {
-                            EventLog.write(this, "ERR", "Voucher rejected  network")
-                            txtError.text = "Network error. Could not reach backend."
-                            txtError.visibility = View.VISIBLE
-                            btnSubmit.isEnabled = true
-                            btnCancel.isEnabled = true
-                        }
+                    }
+                } else {
+                    handler.post { showErrorDialog("Authentication failed. Check email/password.") }
+                }
+            }
+        }
+        
+        dialog.setButton(AlertDialog.BUTTON_NEGATIVE, "CANCEL") { _, _ -> dialog.dismiss() }
+        dialog.show()
+    }
+
+    private fun provisionAfterVoucher(token: String, expiry: String?) {
+        executor.execute {
+            val provResult = ApiClient.provisionConfig(token)
+            handler.post {
+                when (provResult) {
+                    is RegisterResult.Success -> {
+                        ConfigStore.saveConfig(this, provResult.config, provResult.assignedIp, expiry)
+                        EventLog.write(this, "OK", "VPN config provisioned")
+                        refreshUi()
+                        pendingStart = true
+                        requestConsentThenStart()
+                    }
+                    is RegisterResult.Failure -> {
+                        EventLog.write(this, "ERR", "Provision failed: ${provResult.reason}")
+                        showErrorDialog("Voucher ok, but config failed: ${provResult.reason}")
+                    }
+                    RegisterResult.NetworkError -> {
+                        EventLog.write(this, "ERR", "Provision network error")
+                        showErrorDialog("Provision network error")
                     }
                 }
             }
         }
-
-        dialog.show()
     }
 
     private fun registerWithCode(code: String) {
@@ -1058,25 +1086,7 @@ class MainActivity : AppCompatActivity() {
                     is RegisterResult.Success -> {
                         ConfigStore.saveVoucherCode(this, code)
                         EventLog.write(this, "OK", "Voucher accepted")
-                        executor.execute {
-                            val provResult = ApiClient.provisionConfig(token)
-                            handler.post {
-                                when (provResult) {
-                                    is RegisterResult.Success -> {
-                                        ConfigStore.saveConfig(this, provResult.config, provResult.assignedIp, voucherResult.subscriptionExpiresAt)
-                                        EventLog.write(this, "OK", "VPN config provisioned")
-                                        pendingStart = true
-                                        requestConsentThenStart()
-                                    }
-                                    is RegisterResult.Failure -> {
-                                        showErrorDialog("Config failed: ${provResult.reason}")
-                                    }
-                                    RegisterResult.NetworkError -> {
-                                        showErrorDialog("Provision network error")
-                                    }
-                                }
-                            }
-                        }
+                        provisionAfterVoucher(token, voucherResult.subscriptionExpiresAt)
                     }
                     is RegisterResult.Failure -> {
                         EventLog.write(this, "ERR", "Voucher rejected  ${voucherResult.reason}")
