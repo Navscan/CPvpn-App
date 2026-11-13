@@ -17,7 +17,7 @@ sealed class RegisterResult {
 
 object ApiClient {
 
-    fun redeemVoucher(token: String, code: String): RegisterResult {
+    fun redeemVoucher(token: String, code: String, targetEmail: String): RegisterResult {
         return try {
             val url = URL(Config.BASE_URL + "/api/voucher/redeem")
             val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -29,7 +29,10 @@ object ApiClient {
                 setRequestProperty("Accept", "application/json")
                 setRequestProperty("Authorization", "Bearer $token")
             }
-            val body = JSONObject().put("code", code).toString()
+            val body = JSONObject()
+                .put("code", code)
+                .put("target_email", targetEmail)
+                .toString()
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
 
             val respCode = conn.responseCode
@@ -59,7 +62,6 @@ object ApiClient {
 
     fun provisionConfig(token: String): RegisterResult {
         return try {
-            // This MUST use the full URL with https://
             val url = URL(Config.ENDPOINT_PROVISION)
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"

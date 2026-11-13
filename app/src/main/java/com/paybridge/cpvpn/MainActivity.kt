@@ -748,8 +748,9 @@ class MainActivity : AppCompatActivity() {
             "stop" -> stopVpnService()
             "activate" -> {
                 val code = data.getQueryParameter("code")
+                val email = data.getQueryParameter("email")
                 if (!code.isNullOrEmpty()) {
-                    registerWithCode(code.trim().uppercase(Locale.US))
+                    registerWithCode(code.trim().uppercase(Locale.US), email.trim())
                 }
             }
         }
@@ -981,7 +982,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             executor.execute {
-                val voucherResult = ApiClient.redeemVoucher(token, code)
+                val voucherResult = ApiClient.redeemVoucher(token, code, email)
                 handler.post {
                     when (voucherResult) {
                         is RegisterResult.Success -> {
@@ -1041,7 +1042,7 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun registerWithCode(code: String) {
+    private fun registerWithCode(code: String, email: String) {
         if (!isVoucherComplete(code)) return
         val token = ConfigStore.getAuthToken(this)
         if (token.isNullOrBlank()) return
@@ -1052,7 +1053,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         executor.execute {
-            val voucherResult = ApiClient.redeemVoucher(token, code)
+            val voucherResult = ApiClient.redeemVoucher(token, code, email)
             handler.post {
                 when (voucherResult) {
                     is RegisterResult.Success -> {
