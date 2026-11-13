@@ -9,7 +9,8 @@ sealed class RegisterResult {
     data class Success(
         val config: String,
         val assignedIp: String,
-        val subscriptionExpiresAt: String?
+        val subscriptionExpiresAt: String?,
+        val token: String = ""
     ) : RegisterResult()
     data class Failure(val reason: String) : RegisterResult()
     object NetworkError : RegisterResult()
@@ -46,7 +47,8 @@ object ApiClient {
                     RegisterResult.Success(
                         config = "",
                         assignedIp = "",
-                        subscriptionExpiresAt = json.optString("expiry_date", null)
+                        subscriptionExpiresAt = json.optString("expiry_date", null),
+                        token = json.optString("token", "")
                     )
                 } else {
                     RegisterResult.Failure(json.optString("error", "unknown"))

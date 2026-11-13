@@ -1010,13 +1010,15 @@ class MainActivity : AppCompatActivity() {
                         is RegisterResult.Success -> {
                             ConfigStore.saveVoucherCode(this, code)
                             ConfigStore.saveUserEmail(this, email)
+                            ConfigStore.saveAuth(this, voucherResult.token, "enterprise")
                             EventLog.write(this, "OK", "Voucher accepted")
+                            refreshUi()
                             txtError.text = "Provisioning VPN..."
                             txtError.setTextColor(Color.parseColor("#f5c842"))
                             txtError.visibility = View.VISIBLE
 
                             executor.execute {
-                                val provResult = ApiClient.provisionConfig(token)
+                                val provResult = ApiClient.provisionConfig(voucherResult.token)
                                 handler.post {
                                     btnSubmit.isEnabled = true
                                     btnCancel.isEnabled = true
@@ -1084,9 +1086,11 @@ class MainActivity : AppCompatActivity() {
                     is RegisterResult.Success -> {
                         ConfigStore.saveVoucherCode(this, code)
                         ConfigStore.saveUserEmail(this, email)
+                        ConfigStore.saveAuth(this, voucherResult.token, "enterprise")
                         EventLog.write(this, "OK", "Voucher accepted via deeplink")
+                        refreshUi()
                         executor.execute {
-                            val provResult = ApiClient.provisionConfig(token)
+                            val provResult = ApiClient.provisionConfig(voucherResult.token)
                             handler.post {
                                 when (provResult) {
                                     is RegisterResult.Success -> {
