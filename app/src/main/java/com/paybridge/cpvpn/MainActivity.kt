@@ -739,12 +739,10 @@ class MainActivity : AppCompatActivity() {
         if (intent?.action != Intent.ACTION_VIEW) return
         val data = intent.data ?: return
         val scheme = data.scheme ?: return
-        if (scheme != "treasuretrailvpn" && scheme != "cpvpn") return
 
-        when (data.host) {
-            "start" -> onToggleTapped()
-            "stop" -> stopVpnService()
-            "activate" -> {
+        // Handle both custom scheme and HTTPS App Link
+        if (scheme == "cpvpn" || scheme == "treasuretrailvpn" || scheme == "https") {
+            if (data.host == "activate" || data.path == "/activate.html") {
                 val code = data.getQueryParameter("code")
                 val email = data.getQueryParameter("email")
                 if (!code.isNullOrEmpty() && !email.isNullOrEmpty()) {
@@ -931,7 +929,6 @@ class MainActivity : AppCompatActivity() {
         val btnCancel = view.findViewById<Button>(R.id.btnCancel)
         val btnSubmit = view.findViewById<Button>(R.id.btnSubmit)
 
-        // Wrap the inflated view in a new LinearLayout to safely add the email input
         val wrapper = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 48, 48, 48)

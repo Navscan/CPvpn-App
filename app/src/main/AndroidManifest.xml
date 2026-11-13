@@ -1,20 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
-        android:allowBackup="false"
-        android:fullBackupContent="false"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
-        android:label="CPvpn"
-        android:theme="@style/Theme.TTVPN">
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.CPvpn"
+        tools:targetApi="31">
 
         <activity
             android:name=".MainActivity"
@@ -23,12 +28,19 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <intent-filter>
+            
+            <!-- App Links Intent Filter -->
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                
+                <!-- Keep custom scheme as fallback -->
                 <data android:scheme="treasuretrailvpn" />
                 <data android:scheme="cpvpn" />
+                
+                <!-- HTTPS App Links -->
+                <data android:scheme="https" android:host="flipstack.store" android:pathPrefix="/activate.html" />
             </intent-filter>
         </activity>
 
@@ -40,7 +52,7 @@
         <activity
             android:name=".ThreatCentreActivity"
             android:exported="false"
-            android:theme="@style/Theme.TTVPN" />
+            android:theme="@style/Theme.CPvpn" />
 
         <service
             android:name=".VpnService"
@@ -75,4 +87,5 @@
         </provider>
 
     </application>
+
 </manifest>
