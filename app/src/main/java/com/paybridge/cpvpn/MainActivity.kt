@@ -930,8 +930,13 @@ class MainActivity : AppCompatActivity() {
         val txtError = view.findViewById<TextView>(R.id.txtError)
         val btnCancel = view.findViewById<Button>(R.id.btnCancel)
         val btnSubmit = view.findViewById<Button>(R.id.btnSubmit)
-        
-        // Inject an email field dynamically if not in the layout
+
+        // Wrap the inflated view in a new LinearLayout to safely add the email input
+        val wrapper = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 48, 48, 48)
+        }
+
         val emailInput = EditText(this).apply {
             hint = "Email Address"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
@@ -941,10 +946,8 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 20, 0, 20)
         }
         
-        val container = view.findViewById<LinearLayout>(R.id.voucherContainer)
-        if (container != null) {
-            container.addView(emailInput, 0)
-        }
+        wrapper.addView(emailInput)
+        wrapper.addView(view)
 
         editVoucher.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -965,7 +968,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val dialog = AlertDialog.Builder(this)
-            .setView(view)
+            .setView(wrapper)
             .setCancelable(false)
             .create()
 
