@@ -1107,7 +1107,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // UPDATED: Added real voucher error mappings
     private fun reasonToMessage(reason: String): String = when (reason) {
         "voucher_not_found" -> "Voucher not found."
         "voucher_bound_to_different_user" -> "This voucher belongs to a different email."
@@ -1115,6 +1114,7 @@ class MainActivity : AppCompatActivity() {
         "voucher_already_used" -> "This voucher has already been used."
         "subscription_inactive" -> "Subscription is inactive."
         "user_not_found" -> "User not found."
+        "email_already_exists" -> "This email is already in use. Please use a different email."
         else -> reason
     }
 
@@ -1128,7 +1128,8 @@ class MainActivity : AppCompatActivity() {
         val email = ConfigStore.getUserEmail(this)
         val isGuest = email.endsWith("@cpvpn.local") || email.isBlank()
 
-        if (tier == "enterprise" || !isGuest) {
+        // FIX: ONLY Enterprise users can Log Out. Pro and Free users cannot log out.
+        if (tier == "enterprise") {
             btnLogout.visibility = View.VISIBLE
         } else {
             btnLogout.visibility = View.GONE
