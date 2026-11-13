@@ -304,7 +304,7 @@ class MainActivity : AppCompatActivity() {
             }
             tier == "enterprise" -> {
                 val savedVoucher = ConfigStore.getVoucherCode(this)
-                showVoucherDialog(savedVoucher)
+                showVoucherDialog(savedVoucher, email)
             }
             else -> {
                 val options = arrayOf("Login as Enterprise User", "Upgrade to Pro")
@@ -312,7 +312,7 @@ class MainActivity : AppCompatActivity() {
                     .setTitle("Open Tier")
                     .setItems(options) { _, which ->
                         if (which == 0) {
-                            showVoucherDialog(null)
+                            showVoucherDialog(null, null)
                         } else {
                             showUpgradeDialog()
                         }
@@ -384,7 +384,6 @@ class MainActivity : AppCompatActivity() {
         val now = System.currentTimeMillis()
         val twentyFourHours = 24 * 60 * 60 * 1000L
 
-        // If not forced (e.g. from payment) and it's been less than 24 hours, skip the API call
         if (!force && (now - lastSync) < twentyFourHours) {
             return
         }
@@ -396,7 +395,6 @@ class MainActivity : AppCompatActivity() {
                     ConfigStore.saveAuth(this, token, result.tier)
                     EventLog.write(this, "OK", "License synced: ${result.tier}")
                     
-                    // Save the current time to throttle the next sync
                     prefs.edit().putLong("last_license_sync", now).apply()
                     
                     refreshUi()
@@ -749,7 +747,7 @@ class MainActivity : AppCompatActivity() {
             "activate" -> {
                 val code = data.getQueryParameter("code")
                 val email = data.getQueryParameter("email")
-                if (!code.isNullOrEmpty()) {
+                if (!code.isNullOrEmpty() && !email.isNullOrEmpty()) {
                     registerWithCode(code.trim().uppercase(Locale.US), email.trim())
                 }
             }
@@ -926,12 +924,27 @@ class MainActivity : AppCompatActivity() {
         refreshUi()
     }
 
-    private fun showVoucherDialog(prefill: String?) {
+    private fun showVoucherDialog(prefillCode: String?, prefillEmail: String?) {
         val view = LayoutInflater.from(this).inflate(R.layout.voucher, null)
         val editVoucher = view.findViewById<EditText>(R.id.editVoucher)
         val txtError = view.findViewById<TextView>(R.id.txtError)
         val btnCancel = view.findViewById<Button>(R.id.btnCancel)
         val btnSubmit = view.findViewById<Button>(R.id.btnSubmit)
+        
+        // Inject an email field dynamically if not in the layout
+        val emailInput = EditText(this).apply {
+            hint = "Email Address"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+            setText(prefillEmail ?: "")
+            setTextColor(Color.parseColor("#e8edf5"))
+            setHintTextColor(Color.parseColor("#8a9bb0"))
+            setPadding(0, 20, 0, 20)
+        }
+        
+        val container = view.findViewById<LinearLayout>(R.id.voucherContainer)
+        if (container != null) {
+            container.addView(emailInput, 0)
+        }
 
         editVoucher.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -946,9 +959,8 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        val initial = prefill ?: ConfigStore.getVoucherCode(this) ?: readClipboardIfVoucher()
-        if (!initial.isNullOrEmpty()) {
-            editVoucher.setText(formatVoucher(initial))
+        if (!prefillCode.isNullOrEmpty()) {
+            editVoucher.setText(formatVoucher(prefillCode))
             editVoucher.setSelection(editVoucher.text.length)
         }
 
@@ -961,6 +973,13 @@ class MainActivity : AppCompatActivity() {
 
         btnSubmit.setOnClickListener {
             val code = editVoucher.text.toString().trim()
+            val email = emailInput.text.toString().trim()
+            
+            if (email.isBlank() || !email.contains("@")) {
+                txtError.text = "Please enter a valid email address."
+                txtError.visibility = View.VISIBLE
+                return@setOnClickListener
+            }
             if (!isVoucherComplete(code)) {
                 txtError.text = "Please enter a valid 16-character code."
                 txtError.visibility = View.VISIBLE
@@ -987,6 +1006,7 @@ class MainActivity : AppCompatActivity() {
                     when (voucherResult) {
                         is RegisterResult.Success -> {
                             ConfigStore.saveVoucherCode(this, code)
+                            ConfigStore.saveUserEmail(this, email)
                             EventLog.write(this, "OK", "Voucher accepted")
                             txtError.text = "Provisioning VPN..."
                             txtError.setTextColor(Color.parseColor("#f5c842"))
@@ -1051,6 +1071,8 @@ class MainActivity : AppCompatActivity() {
             VpnService.stop(this)
             Thread.sleep(1000)
         }
+        
+        EventLog.write(this, "EVENT", "Deeplink activated")
 
         executor.execute {
             val voucherResult = ApiClient.redeemVoucher(token, code, email)
@@ -1058,7 +1080,8 @@ class MainActivity : AppCompatActivity() {
                 when (voucherResult) {
                     is RegisterResult.Success -> {
                         ConfigStore.saveVoucherCode(this, code)
-                        EventLog.write(this, "OK", "Voucher accepted")
+                        ConfigStore.saveUserEmail(this, email)
+                        EventLog.write(this, "OK", "Voucher accepted via deeplink")
                         executor.execute {
                             val provResult = ApiClient.provisionConfig(token)
                             handler.post {
@@ -1143,7 +1166,6 @@ class MainActivity : AppCompatActivity() {
         val email = ConfigStore.getUserEmail(this)
         val isGuest = email.endsWith("@cpvpn.local") || email.isBlank()
 
-        // ONLY Enterprise users can Log Out. Pro and Free users cannot log out.
         if (tier == "enterprise") {
             btnLogout.visibility = View.VISIBLE
         } else {
