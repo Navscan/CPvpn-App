@@ -353,8 +353,8 @@ class MainActivity : AppCompatActivity() {
         checkLicenseAndRefresh()
 
         if (awaitingPayment) {
-            handler.postDelayed({ checkLicenseAndRefresh() }, 3000)
-            handler.postDelayed({ checkLicenseAndRefresh() }, 6000)
+            handler.postDelayed({ checkLicenseAndRefresh(force = true) }, 3000)
+            handler.postDelayed({ checkLicenseAndRefresh(force = true) }, 6000)
             awaitingPayment = false
         }
     }
@@ -375,9 +375,19 @@ class MainActivity : AppCompatActivity() {
         handleIntent(intent)
     }
 
-    private fun checkLicenseAndRefresh() {
+    private fun checkLicenseAndRefresh(force: Boolean = false) {
         val token = ConfigStore.getAuthToken(this)
         if (token.isNullOrBlank()) return
+
+        val prefs = getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE)
+        val lastSync = prefs.getLong("last_license_sync", 0L)
+        val now = System.currentTimeMillis()
+        val twentyFourHours = 24 * 60 * 60 * 1000L
+
+        // If not forced (e.g. from payment) and it's been less than 24 hours, skip the API call
+        if (!force && (now - lastSync) < twentyFourHours) {
+            return
+        }
         
         executor.execute {
             val result = AuthClient.checkLicense(token)
@@ -385,6 +395,10 @@ class MainActivity : AppCompatActivity() {
                 if (result.isActive) {
                     ConfigStore.saveAuth(this, token, result.tier)
                     EventLog.write(this, "OK", "License synced: ${result.tier}")
+                    
+                    // Save the current time to throttle the next sync
+                    prefs.edit().putLong("last_license_sync", now).apply()
+                    
                     refreshUi()
                 }
             }
@@ -1128,7 +1142,7 @@ class MainActivity : AppCompatActivity() {
         val email = ConfigStore.getUserEmail(this)
         val isGuest = email.endsWith("@cpvpn.local") || email.isBlank()
 
-        // FIX: ONLY Enterprise users can Log Out. Pro and Free users cannot log out.
+        // ONLY Enterprise users can Log Out. Pro and Free users cannot log out.
         if (tier == "enterprise") {
             btnLogout.visibility = View.VISIBLE
         } else {
