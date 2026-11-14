@@ -2,6 +2,12 @@
 <resources>
     <string name="app_name">CPvpn</string>
 
+    <!-- VPN Notification Strings (NEW) -->
+    <string name="vpn_notification_title">CPvpn</string>
+    <string name="vpn_notification_text">Protected by PayBridge (Pty) Ltd</string>
+    <string name="vpn_channel_name">VPN Status</string>
+
+    <!-- Existing UI Strings -->
     <string name="state_disconnected">DISCONNECTED</string>
     <string name="state_connecting">CONNECTING</string>
     <string name="state_secured">SECURED</string>

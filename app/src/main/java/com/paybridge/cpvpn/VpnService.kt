@@ -235,7 +235,7 @@ class VpnService : GoBackend.VpnService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 Config.NOTIFICATION_CHANNEL_ID,
-                "VPN Status",
+                getString(R.string.vpn_channel_name), // FIXED
                 NotificationManager.IMPORTANCE_LOW
             )
             getSystemService(NotificationManager::class.java)
@@ -246,8 +246,8 @@ class VpnService : GoBackend.VpnService() {
             this, 0, intent, PendingIntent.FLAG_IMMUTABLE
         )
         val notification = NotificationCompat.Builder(this, Config.NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("TTVPN™")
-            .setContentText("Protected by PayBridge (Pty) Ltd")
+            .setContentTitle(getString(R.string.vpn_notification_title)) // FIXED (Replaced TT VPN)
+            .setContentText(getString(R.string.vpn_notification_text)) // FIXED
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentIntent(pendingIntent)
             .build()
