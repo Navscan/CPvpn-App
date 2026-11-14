@@ -1,4 +1,4 @@
-name: Build Release APK & Publish
+name: Build Debug APK & Publish
 
 on:
   push:
@@ -26,26 +26,26 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Build Release APK
-      run: ./gradlew assembleRelease
+    # CHANGED: Building Debug to bypass keystore requirement for UI testing
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug
 
     - name: Prepare APK for Release
       run: |
         mkdir -p release
-        # Find the generated release APK and rename it exactly to CPvpn.apk
-        find app/build/outputs/apk/release -name "*.apk" -exec cp {} release/CPvpn.apk \;
+        # Find the generated debug APK and rename it to CPvpn.apk
+        find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release/CPvpn.apk \;
 
     - name: Create GitHub Release & Upload Asset
       uses: softprops/action-gh-release@v2
       if: github.ref == 'refs/heads/main'
       with:
-        tag_name: v1.0.${{ github.run_number }}
-        name: CPvpn Release v1.0.${{ github.run_number }}
+        tag_name: v1.0.${{ github.run_number }}-debug
+        name: CPvpn Debug v1.0.${{ github.run_number }}
         body: |
-          Automated release for commit ${{ github.sha }}
-          * Build #${{ github.run_number }}
+          Debug build for UI testing (Voucher Modal).
         draft: false
-        prerelease: false
+        prerelease: true
         files: release/CPvpn.apk
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
