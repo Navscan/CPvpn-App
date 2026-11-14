@@ -740,9 +740,16 @@ class MainActivity : AppCompatActivity() {
         val data = intent.data ?: return
         val scheme = data.scheme ?: return
 
-        // Handle both custom scheme and HTTPS App Link
-        if (scheme == "cpvpn" || scheme == "treasuretrailvpn" || scheme == "https") {
-            if (data.host == "activate" || data.path == "/activate.html") {
+        if (scheme == "cpvpn" || scheme == "treasuretrailvpn") {
+            if (data.host == "activate") {
+                val code = data.getQueryParameter("code")
+                val email = data.getQueryParameter("email")
+                if (!code.isNullOrEmpty() && !email.isNullOrEmpty()) {
+                    registerWithCode(code.trim().uppercase(Locale.US), email.trim())
+                }
+            }
+        } else if (scheme == "https") {
+            if (data.host == "flipstack.store" && data.path == "/activate.html") {
                 val code = data.getQueryParameter("code")
                 val email = data.getQueryParameter("email")
                 if (!code.isNullOrEmpty() && !email.isNullOrEmpty()) {

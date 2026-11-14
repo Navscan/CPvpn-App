@@ -27,17 +27,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             
-            <!-- App Links Intent Filter -->
+            <!-- 1. Custom Scheme (Manual Fallback) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="treasuretrailvpn" />
+                <data android:scheme="cpvpn" />
+            </intent-filter>
+
+            <!-- 2. HTTPS App Links (Automatic) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                
-                <!-- Keep custom scheme as fallback -->
-                <data android:scheme="treasuretrailvpn" />
-                <data android:scheme="cpvpn" />
-                
-                <!-- HTTPS App Links -->
                 <data android:scheme="https" android:host="flipstack.store" android:pathPrefix="/activate.html" />
             </intent-filter>
         </activity>
