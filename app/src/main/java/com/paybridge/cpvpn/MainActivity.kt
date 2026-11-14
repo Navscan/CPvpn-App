@@ -180,10 +180,16 @@ class MainActivity : AppCompatActivity() {
 
         btnExit.setOnClickListener { finishAffinity() }
 
+        // UPDATED: Toggle between LOGOUT (Enterprise) and LOGIN (Open)
         btnLogout.setOnClickListener {
-            VpnService.stop(this)
-            ConfigStore.clearAuth(this)
-            finishAffinity()
+            if (ConfigStore.getUserTier(this) == "enterprise") {
+                VpnService.stop(this)
+                ConfigStore.clearAuth(this)
+                EventLog.write(this, "EVENT", "Logged out of Enterprise")
+                refreshUi()
+            } else {
+                showVoucherDialog(null, null)
+            }
         }
 
         btnUpdateReady.setOnClickListener { onUpdateReadyTapped() }
@@ -387,16 +393,16 @@ class MainActivity : AppCompatActivity() {
         if (!force && (now - lastSync) < twentyFourHours) {
             return
         }
-        
+
         executor.execute {
             val result = AuthClient.checkLicense(token)
             handler.post {
                 if (result.isActive) {
                     ConfigStore.saveAuth(this, token, result.tier)
                     EventLog.write(this, "OK", "License synced: ${result.tier}")
-                    
+
                     prefs.edit().putLong("last_license_sync", now).apply()
-                    
+
                     refreshUi()
                 }
             }
@@ -416,7 +422,7 @@ class MainActivity : AppCompatActivity() {
     private fun initiatePayment(plan: String) {
         val token = ConfigStore.getAuthToken(this)
         if (token.isNullOrBlank()) return
-        
+
         val currentEmail = ConfigStore.getUserEmail(this)
 
         if (currentEmail.endsWith("@cpvpn.local") || currentEmail.isBlank()) {
@@ -459,7 +465,7 @@ class MainActivity : AppCompatActivity() {
 
                 val token = ConfigStore.getAuthToken(this)
                 if (token.isNullOrBlank()) return@setPositiveButton
-                
+
                 executor.execute {
                     val updateResult = AuthClient.updateEmail(token, newEmail)
                     handler.post {
@@ -808,7 +814,7 @@ class MainActivity : AppCompatActivity() {
                         is RegisterResult.Failure -> {
                             EventLog.write(this, "ERR", "Provision failed: ${provResult.reason}")
                             refreshUi()
-                            
+
                             if (!forcedGuestReset) {
                                 forcedGuestReset = true
                                 EventLog.write(this, "WARN", "Provision failed. Wiping auth and forcing Guest.")
@@ -947,7 +953,7 @@ class MainActivity : AppCompatActivity() {
             setHintTextColor(Color.parseColor("#8a9bb0"))
             setPadding(0, 20, 0, 20)
         }
-        
+
         wrapper.addView(emailInput)
         wrapper.addView(view)
 
@@ -979,7 +985,7 @@ class MainActivity : AppCompatActivity() {
         btnSubmit.setOnClickListener {
             val code = editVoucher.text.toString().trim()
             val email = emailInput.text.toString().trim()
-            
+
             if (email.isBlank() || !email.contains("@")) {
                 txtError.text = "Please enter a valid email address."
                 txtError.visibility = View.VISIBLE
@@ -1004,7 +1010,6 @@ class MainActivity : AppCompatActivity() {
                 VpnService.stop(this)
                 Thread.sleep(1000)
             }
-
             executor.execute {
                 val voucherResult = ApiClient.redeemVoucher(token, code, email)
                 handler.post {
@@ -1078,7 +1083,7 @@ class MainActivity : AppCompatActivity() {
             VpnService.stop(this)
             Thread.sleep(1000)
         }
-        
+
         EventLog.write(this, "EVENT", "Deeplink activated")
 
         executor.execute {
@@ -1175,10 +1180,13 @@ class MainActivity : AppCompatActivity() {
         val email = ConfigStore.getUserEmail(this)
         val isGuest = email.endsWith("@cpvpn.local") || email.isBlank()
 
+        btnLogout.visibility = View.VISIBLE
         if (tier == "enterprise") {
-            btnLogout.visibility = View.VISIBLE
+            btnLogout.text = "LOGOUT"
+            btnLogout.setTextColor(Color.parseColor("#ff6b6b"))
         } else {
-            btnLogout.visibility = View.GONE
+            btnLogout.text = "LOGIN"
+            btnLogout.setTextColor(Color.parseColor("#4cd9b2"))
         }
 
         btnTopRightStatus.text = when {
@@ -1186,7 +1194,6 @@ class MainActivity : AppCompatActivity() {
             tier == "pro" -> "Pro"
             else -> "Open"
         }
-
         suppressLockChange = true
         checkLock.isChecked = lockOn
         suppressLockChange = false
