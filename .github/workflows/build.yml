@@ -26,14 +26,12 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    # CHANGED: Building Debug to bypass keystore requirement for UI testing
     - name: Build Debug APK
       run: ./gradlew assembleDebug
 
     - name: Prepare APK for Release
       run: |
         mkdir -p release
-        # Find the generated debug APK and rename it to CPvpn.apk
         find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release/CPvpn.apk \;
 
     - name: Create GitHub Release & Upload Asset
@@ -43,9 +41,9 @@ jobs:
         tag_name: v1.0.${{ github.run_number }}-debug
         name: CPvpn Debug v1.0.${{ github.run_number }}
         body: |
-          Debug build for UI testing (Voucher Modal).
+          Debug build for UI testing.
         draft: false
-        prerelease: true
+        prerelease: false # CHANGED TO FALSE so /latest/ URL works
         files: release/CPvpn.apk
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
