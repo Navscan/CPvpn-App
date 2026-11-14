@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -180,7 +181,7 @@ class MainActivity : AppCompatActivity() {
 
         btnExit.setOnClickListener { finishAffinity() }
 
-        // UPDATED: Toggle between LOGOUT (Enterprise) and LOGIN (Open)
+        // Toggle between LOGOUT (Enterprise) and LOGIN (Open)
         btnLogout.setOnClickListener {
             if (ConfigStore.getUserTier(this) == "enterprise") {
                 VpnService.stop(this)
@@ -298,7 +299,6 @@ class MainActivity : AppCompatActivity() {
     private fun onTopRightTapped() {
         val tier = ConfigStore.getUserTier(this)
         val email = ConfigStore.getUserEmail(this)
-        val isGuest = email.endsWith("@cpvpn.local") || email.isBlank()
 
         when {
             tier == "pro" -> {
@@ -935,27 +935,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun showVoucherDialog(prefillCode: String?, prefillEmail: String?) {
         val view = LayoutInflater.from(this).inflate(R.layout.voucher, null)
+        val emailInput = view.findViewById<EditText>(R.id.editEmail)
         val editVoucher = view.findViewById<EditText>(R.id.editVoucher)
         val txtError = view.findViewById<TextView>(R.id.txtError)
         val btnCancel = view.findViewById<Button>(R.id.btnCancel)
         val btnSubmit = view.findViewById<Button>(R.id.btnSubmit)
 
-        val wrapper = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(48, 48, 48, 48)
+        if (!prefillEmail.isNullOrEmpty()) {
+            emailInput.setText(prefillEmail)
         }
-
-        val emailInput = EditText(this).apply {
-            hint = "Email Address"
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
-            setText(prefillEmail ?: "")
-            setTextColor(Color.parseColor("#e8edf5"))
-            setHintTextColor(Color.parseColor("#8a9bb0"))
-            setPadding(0, 20, 0, 20)
-        }
-
-        wrapper.addView(emailInput)
-        wrapper.addView(view)
 
         editVoucher.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -976,9 +964,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         val dialog = AlertDialog.Builder(this)
-            .setView(wrapper)
+            .setView(view)
             .setCancelable(false)
             .create()
+
+        // THIS REMOVES THE GREY BOX
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
         btnCancel.setOnClickListener { dialog.dismiss() }
 
@@ -1148,23 +1139,13 @@ class MainActivity : AppCompatActivity() {
         return clean.length == 16 && clean.all { it.isLetterOrDigit() }
     }
 
-    private fun readClipboardIfVoucher(): String? {
-        return try {
-            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val text = cm.primaryClip?.getItemAt(0)?.text?.toString() ?: return null
-            val clean = text.uppercase(Locale.US).replace(Regex("[^A-Z0-9]"), "")
-            if (clean.length == 16) text else null
-        } catch (_: Exception) {
-            null
-        }
-    }
-
     private fun reasonToMessage(reason: String): String = when (reason) {
         "voucher_not_found" -> "Voucher not found."
         "voucher_bound_to_different_user" -> "This voucher belongs to a different email."
         "voucher_already_claimed" -> "This voucher has already been claimed."
         "voucher_already_used" -> "This voucher has already been used."
         "subscription_inactive" -> "Subscription is inactive."
+        "subscription_expired" -> "This subscription has expired."
         "user_not_found" -> "User not found."
         "email_already_exists" -> "This email is already in use. Please use a different email."
         else -> reason
@@ -1178,7 +1159,6 @@ class MainActivity : AppCompatActivity() {
         val customDns = ConfigStore.getCustomDns(this)
         val tier = ConfigStore.getUserTier(this)
         val email = ConfigStore.getUserEmail(this)
-        val isGuest = email.endsWith("@cpvpn.local") || email.isBlank()
 
         btnLogout.visibility = View.VISIBLE
         if (tier == "enterprise") {
