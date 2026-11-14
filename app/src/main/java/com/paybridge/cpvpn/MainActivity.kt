@@ -748,13 +748,11 @@ class MainActivity : AppCompatActivity() {
                     registerWithCode(code.trim().uppercase(Locale.US), email.trim())
                 }
             }
-        } else if (scheme == "https") {
-            if (data.host == "flipstack.store" && data.path == "/activate.html") {
-                val code = data.getQueryParameter("code")
-                val email = data.getQueryParameter("email")
-                if (!code.isNullOrEmpty() && !email.isNullOrEmpty()) {
-                    registerWithCode(code.trim().uppercase(Locale.US), email.trim())
-                }
+        } else if (scheme == "https" && data.host == "flipstack.store" && data.path == "/activate.html") {
+            val code = data.getQueryParameter("code")
+            val email = data.getQueryParameter("email")
+            if (!code.isNullOrEmpty() && !email.isNullOrEmpty()) {
+                registerWithCode(code.trim().uppercase(Locale.US), email.trim())
             }
         }
     }
