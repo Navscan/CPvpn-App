@@ -15,15 +15,6 @@ object Updater {
     @Volatile
     var checkInProgress = false
 
-    /**
-     * Fetches the latest release metadata from GitHub. Returns the
-     * remote versionCode if an update is available and download-ready,
-     * otherwise null. Does not download. Cache-aware: skips the network
-     * entirely if last successful check was under UPDATE_CHECK_INTERVAL_MS
-     * ago.
-     *
-     * Synchronous. Caller must run on a background thread.
-     */
     fun checkForUpdate(context: Context): Int? {
         if (checkInProgress) return null
         checkInProgress = true
@@ -48,7 +39,7 @@ object Updater {
                 val asset = assets.optJSONObject(i) ?: continue
                 when (asset.optString("name", "")) {
                     "version.json" -> versionJsonUrl = asset.optString("browser_download_url", "")
-                    "TTVPN.apk" -> apkUrl = asset.optString("browser_download_url", "")
+                    "CPvpn.apk" -> apkUrl = asset.optString("browser_download_url", "") // FIXED: Matches CI/CD
                 }
             }
             if (versionJsonUrl.isNullOrEmpty() || apkUrl.isNullOrEmpty()) return null
@@ -78,12 +69,6 @@ object Updater {
         }
     }
 
-    /**
-     * Downloads the staged APK into the app cache. Only runs on unmetered
-     * networks. Returns true if a complete APK is now on disk and its path
-     * is recorded in prefs. Synchronous. Caller must run on a background
-     * thread.
-     */
     fun downloadApk(context: Context): Boolean {
         if (!isUnmetered(context)) return false
 
@@ -131,10 +116,6 @@ object Updater {
         }
     }
 
-    /**
-     * True if a staged APK is on disk and its recorded version is newer
-     * than BuildConfig.VERSION_CODE.
-     */
     fun isUpdateStaged(context: Context): Boolean {
         val prefs = context.getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE)
         val path = prefs.getString(Config.PREF_STAGED_UPDATE_PATH, null) ?: return false
@@ -144,12 +125,6 @@ object Updater {
         return file.exists() && file.length() > 0L
     }
 
-    /**
-     * Fires the system install dialog for the staged APK. No-op if
-     * nothing is staged. Must be called from a context where
-     * FileProvider can resolve the authority — this is declared in
-     * AndroidManifest.xml.
-     */
     fun installStagedUpdate(context: Context) {
         val prefs = context.getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE)
         val path = prefs.getString(Config.PREF_STAGED_UPDATE_PATH, null) ?: return
@@ -172,10 +147,6 @@ object Updater {
         }
     }
 
-    /**
-     * Deletes the staged APK and clears all updater prefs. Call on
-     * successful install (new versionCode detected on next launch).
-     */
     fun clearStagedUpdate(context: Context) {
         val prefs = context.getSharedPreferences(Config.PREFS_NAME, Context.MODE_PRIVATE)
         val dir = File(context.cacheDir, Config.UPDATER_SUBDIR)
