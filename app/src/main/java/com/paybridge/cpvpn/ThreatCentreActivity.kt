@@ -90,9 +90,10 @@ class ThreatCentreActivity : AppCompatActivity() {
                 if (date != null) timeStr = outputFormat.format(date)
             } catch (_: Exception) {}
 
+            // FIXED: The logic here was color-matching "BANNED" inside "UNBANNED"
             val (actionColor, actionText) = when {
-                log.action.contains("BANNED") -> Pair(Color.parseColor("#FF4545"), "BANNED")
-                log.action.contains("UNBANNED") -> Pair(Color.parseColor("#4ADE80"), "UNBANNED")
+                log.action.startsWith("BANNED") -> Pair(Color.parseColor("#FF4545"), "BANNED")
+                log.action.startsWith("UNBANNED") -> Pair(Color.parseColor("#4ADE80"), "UNBANNED")
                 log.action.contains("REPORT") -> Pair(Color.parseColor("#D4AF37"), "SYSTEM")
                 else -> Pair(Color.parseColor("#AAB"), log.action)
             }
