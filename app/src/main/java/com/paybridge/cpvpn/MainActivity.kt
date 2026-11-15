@@ -999,8 +999,12 @@ class MainActivity : AppCompatActivity() {
                 VpnService.stop(this)
                 Thread.sleep(1000)
             }
+            
+            // --- GET DEVICE ID FOR BINDING ---
+            val deviceId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: UUID.randomUUID().toString()
+            
             executor.execute {
-                val voucherResult = ApiClient.redeemVoucher(token, code, email)
+                val voucherResult = ApiClient.redeemVoucher(token, code, email, deviceId)
                 handler.post {
                     when (voucherResult) {
                         is RegisterResult.Success -> {
@@ -1075,8 +1079,11 @@ class MainActivity : AppCompatActivity() {
 
         EventLog.write(this, "EVENT", "Deeplink activated")
 
+        // --- GET DEVICE ID FOR BINDING ---
+        val deviceId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: UUID.randomUUID().toString()
+
         executor.execute {
-            val voucherResult = ApiClient.redeemVoucher(token, code, email)
+            val voucherResult = ApiClient.redeemVoucher(token, code, email, deviceId)
             handler.post {
                 when (voucherResult) {
                     is RegisterResult.Success -> {
@@ -1142,6 +1149,7 @@ class MainActivity : AppCompatActivity() {
         "voucher_bound_to_different_user" -> "This key belongs to a different email."
         "voucher_already_claimed" -> "This key has already been claimed."
         "voucher_already_used" -> "This key has already been used."
+        "key_bound_to_another_device" -> "This key is already active on another phone. Contact admin to reset."
         "subscription_inactive" -> "Subscription is inactive."
         "subscription_expired" -> "This subscription has expired."
         "user_not_found" -> "User not found."
