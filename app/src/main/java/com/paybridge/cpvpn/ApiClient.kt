@@ -18,7 +18,8 @@ sealed class RegisterResult {
 
 object ApiClient {
 
-    fun redeemVoucher(token: String, code: String, targetEmail: String): RegisterResult {
+    // UPDATED: Added deviceId parameter
+    fun redeemVoucher(token: String, code: String, targetEmail: String, deviceId: String): RegisterResult {
         return try {
             val url = URL(Config.BASE_URL + "/api/voucher/redeem")
             val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -33,6 +34,7 @@ object ApiClient {
             val body = JSONObject()
                 .put("code", code)
                 .put("target_email", targetEmail)
+                .put("device_id", deviceId) // UPDATED: Send device ID to backend
                 .toString()
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
 
