@@ -45,7 +45,8 @@ sealed class CerberusLogsResult {
 
 object CerberusClient {
 
-    fun fetch(): CerberusResult {
+    // UPDATED: Added token parameter
+    fun fetch(token: String): CerberusResult {
         return try {
             val url = URL(Config.ENDPOINT_CERBERUS)
             val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -53,6 +54,7 @@ object CerberusClient {
                 connectTimeout = Config.HTTP_CONNECT_TIMEOUT_MS
                 readTimeout = Config.HTTP_READ_TIMEOUT_MS
                 setRequestProperty("Accept", "application/json")
+                setRequestProperty("Authorization", "Bearer $token") // UPDATED: Send Token
             }
 
             val code = conn.responseCode
@@ -113,7 +115,7 @@ object CerberusClient {
         }
     }
 
-    fun fetchLogs(): CerberusLogsResult {
+    fun fetchLogs(token: String): CerberusLogsResult { // UPDATED: Added token here too
         return try {
             val url = URL(Config.BASE_URL + "/api/cerberus/logs")
             val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -121,6 +123,7 @@ object CerberusClient {
                 connectTimeout = Config.HTTP_CONNECT_TIMEOUT_MS
                 readTimeout = Config.HTTP_READ_TIMEOUT_MS
                 setRequestProperty("Accept", "application/json")
+                setRequestProperty("Authorization", "Bearer $token") // UPDATED
             }
 
             val code = conn.responseCode

@@ -486,12 +486,16 @@ class MainActivity : AppCompatActivity() {
     private fun refreshCerberus() {
         if (!isThreatTabActive) return
 
+        val token = ConfigStore.getAuthToken(this)
+        if (token.isNullOrBlank()) return
+
         btnCerberusRefresh.isEnabled = false
         txtCerberusStatus.text = "Loading…"
         txtCerberusStatus.setTextColor(Color.parseColor("#8a9bb0"))
 
         executor.execute {
-            val result = CerberusClient.fetch()
+            // UPDATED: Pass token to fetch
+            val result = CerberusClient.fetch(token)
             handler.post {
                 btnCerberusRefresh.isEnabled = true
                 when (result) {
