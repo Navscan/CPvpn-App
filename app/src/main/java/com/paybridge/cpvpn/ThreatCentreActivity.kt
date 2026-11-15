@@ -53,7 +53,6 @@ class ThreatCentreActivity : AppCompatActivity() {
         }
 
         executor.execute {
-            // UPDATED: Pass token to the client
             val result = CerberusClient.fetchLogs(token)
             handler.post {
                 logsContainer.removeAllViews()
@@ -72,7 +71,7 @@ class ThreatCentreActivity : AppCompatActivity() {
             return
         }
 
-        val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+        val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
         inputFormat.timeZone = TimeZone.getTimeZone("UTC")
         val outputFormat = SimpleDateFormat("HH:mm:ss", Locale.US)
         outputFormat.timeZone = TimeZone.getDefault()
@@ -83,18 +82,18 @@ class ThreatCentreActivity : AppCompatActivity() {
                 setPadding(0, 8, 0, 8)
             }
 
-            // Format timestamp
+            // Format timestamp - ignore milliseconds and Z
             var timeStr = "--:--:--"
             try {
-                val date = inputFormat.parse(log.timestamp)
+                val cleanTs = log.timestamp.substringBefore('.').removeSuffix("Z")
+                val date = inputFormat.parse(cleanTs)
                 if (date != null) timeStr = outputFormat.format(date)
             } catch (_: Exception) {}
 
-            // Determine colors based on action
             val (actionColor, actionText) = when {
-                log.action.startsWith("BANNED") -> Pair(Color.parseColor("#FF4545"), "BANNED")
-                log.action.startsWith("UNBANNED") -> Pair(Color.parseColor("#4ADE80"), "UNBANNED")
-                log.action.startsWith("REPORT") -> Pair(Color.parseColor("#D4AF37"), "SYSTEM")
+                log.action.contains("BANNED") -> Pair(Color.parseColor("#FF4545"), "BANNED")
+                log.action.contains("UNBANNED") -> Pair(Color.parseColor("#4ADE80"), "UNBANNED")
+                log.action.contains("REPORT") -> Pair(Color.parseColor("#D4AF37"), "SYSTEM")
                 else -> Pair(Color.parseColor("#AAB"), log.action)
             }
 
@@ -109,7 +108,7 @@ class ThreatCentreActivity : AppCompatActivity() {
             // Line 2: Geo Info or System Report
             val line2 = TextView(this).apply {
                 if (log.ip == "SYSTEM") {
-                    text = "> ${log.action}"
+                    text = "> ${log.action}" // Prints the full REPORT text
                     setTextColor(Color.parseColor("#D4AF37"))
                 } else {
                     text = "${log.flag} ${log.country} · ${log.isp} [${log.jail}]"
@@ -124,7 +123,6 @@ class ThreatCentreActivity : AppCompatActivity() {
             row.addView(line2)
             logsContainer.addView(row)
 
-            // Divider
             val divider = View(this).apply {
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1)
                 setBackgroundColor(Color.parseColor("#1A1A22"))
