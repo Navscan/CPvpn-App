@@ -18,12 +18,12 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Enter your email and voucher code to restore your session."
+        android:text="Enter your email and Product Key to restore your session."
         android:textColor="#8a9bb0"
         android:textSize="12sp"
         android:layout_marginBottom="16dp"/>
 
-    <!-- EMAIL INPUT (NEW) -->
+    <!-- EMAIL INPUT -->
     <EditText
         android:id="@+id/editEmail"
         android:layout_width="match_parent"
@@ -36,12 +36,12 @@
         android:paddingBottom="8dp"
         android:layout_marginBottom="16dp" />
 
-    <!-- VOUCHER INPUT -->
+    <!-- PRODUCT KEY INPUT -->
     <EditText
         android:id="@+id/editVoucher"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="16-Character Voucher Code"
+        android:hint="16-Character Product Key"
         android:inputType="textCapCharacters|textNoSuggestions"
         android:textColor="#e8edf5"
         android:textColorHint="#8a9bb0"

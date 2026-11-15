@@ -181,7 +181,6 @@ class MainActivity : AppCompatActivity() {
 
         btnExit.setOnClickListener { finishAffinity() }
 
-        // Toggle between LOGOUT (Enterprise) and LOGIN (Open)
         btnLogout.setOnClickListener {
             if (ConfigStore.getUserTier(this) == "enterprise") {
                 VpnService.stop(this)
@@ -787,7 +786,7 @@ class MainActivity : AppCompatActivity() {
         val tier = ConfigStore.getUserTier(this)
 
         if (tier == "enterprise" && ConfigStore.getVoucherCode(this) == null) {
-            showErrorDialog("No active voucher token found. Please tap Enterprise to enter your voucher.")
+            showErrorDialog("No active Product Key found. Please tap Enterprise to enter your key.")
             return
         }
 
@@ -968,7 +967,6 @@ class MainActivity : AppCompatActivity() {
             .setCancelable(false)
             .create()
 
-        // THIS REMOVES THE GREY BOX
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
         btnCancel.setOnClickListener { dialog.dismiss() }
@@ -983,7 +981,7 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             if (!isVoucherComplete(code)) {
-                txtError.text = "Please enter a valid 16-character code."
+                txtError.text = "Please enter a valid 16-character Product Key."
                 txtError.visibility = View.VISIBLE
                 return@setOnClickListener
             }
@@ -991,7 +989,7 @@ class MainActivity : AppCompatActivity() {
             val token = ConfigStore.getAuthToken(this)
             if (token.isNullOrBlank()) return@setOnClickListener
 
-            EventLog.write(this, "EVENT", "Voucher submitted  ${EventLog.maskVoucher(code)}")
+            EventLog.write(this, "EVENT", "Product Key submitted  ${EventLog.maskVoucher(code)}")
 
             btnSubmit.isEnabled = false
             btnCancel.isEnabled = false
@@ -1009,7 +1007,7 @@ class MainActivity : AppCompatActivity() {
                             ConfigStore.saveVoucherCode(this, code)
                             ConfigStore.saveUserEmail(this, email)
                             ConfigStore.saveAuth(this, voucherResult.token, "enterprise")
-                            EventLog.write(this, "OK", "Voucher accepted")
+                            EventLog.write(this, "OK", "Product Key accepted")
                             refreshUi()
                             txtError.text = "Provisioning VPN..."
                             txtError.setTextColor(Color.parseColor("#f5c842"))
@@ -1031,7 +1029,7 @@ class MainActivity : AppCompatActivity() {
                                         }
                                         is RegisterResult.Failure -> {
                                             EventLog.write(this, "ERR", "Provision failed: ${provResult.reason}")
-                                            txtError.text = "Voucher ok, but config failed: ${provResult.reason}"
+                                            txtError.text = "Key ok, but config failed: ${provResult.reason}"
                                             txtError.visibility = View.VISIBLE
                                         }
                                         RegisterResult.NetworkError -> {
@@ -1044,14 +1042,14 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                         is RegisterResult.Failure -> {
-                            EventLog.write(this, "ERR", "Voucher rejected  ${voucherResult.reason}")
+                            EventLog.write(this, "ERR", "Key rejected  ${voucherResult.reason}")
                             txtError.text = reasonToMessage(voucherResult.reason)
                             txtError.visibility = View.VISIBLE
                             btnSubmit.isEnabled = true
                             btnCancel.isEnabled = true
                         }
                         RegisterResult.NetworkError -> {
-                            EventLog.write(this, "ERR", "Voucher rejected  network")
+                            EventLog.write(this, "ERR", "Key rejected  network")
                             txtError.text = "Network error. Could not reach backend."
                             txtError.visibility = View.VISIBLE
                             btnSubmit.isEnabled = true
@@ -1085,7 +1083,7 @@ class MainActivity : AppCompatActivity() {
                         ConfigStore.saveVoucherCode(this, code)
                         ConfigStore.saveUserEmail(this, email)
                         ConfigStore.saveAuth(this, voucherResult.token, "enterprise")
-                        EventLog.write(this, "OK", "Voucher accepted via deeplink")
+                        EventLog.write(this, "OK", "Key accepted via deeplink")
                         refreshUi()
                         executor.execute {
                             val provResult = ApiClient.provisionConfig(voucherResult.token)
@@ -1108,11 +1106,11 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     is RegisterResult.Failure -> {
-                        EventLog.write(this, "ERR", "Voucher rejected  ${voucherResult.reason}")
+                        EventLog.write(this, "ERR", "Key rejected  ${voucherResult.reason}")
                         showErrorDialog(reasonToMessage(voucherResult.reason))
                     }
                     RegisterResult.NetworkError -> {
-                        EventLog.write(this, "ERR", "Voucher rejected  network")
+                        EventLog.write(this, "ERR", "Key rejected  network")
                         showErrorDialog("Network error. Could not reach backend.")
                     }
                 }
@@ -1140,10 +1138,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun reasonToMessage(reason: String): String = when (reason) {
-        "voucher_not_found" -> "Voucher not found."
-        "voucher_bound_to_different_user" -> "This voucher belongs to a different email."
-        "voucher_already_claimed" -> "This voucher has already been claimed."
-        "voucher_already_used" -> "This voucher has already been used."
+        "voucher_not_found" -> "Product Key not found."
+        "voucher_bound_to_different_user" -> "This key belongs to a different email."
+        "voucher_already_claimed" -> "This key has already been claimed."
+        "voucher_already_used" -> "This key has already been used."
         "subscription_inactive" -> "Subscription is inactive."
         "subscription_expired" -> "This subscription has expired."
         "user_not_found" -> "User not found."
