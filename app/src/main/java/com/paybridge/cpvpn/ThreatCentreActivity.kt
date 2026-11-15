@@ -46,8 +46,15 @@ class ThreatCentreActivity : AppCompatActivity() {
         }
         logsContainer.addView(loading)
 
+        val token = ConfigStore.getAuthToken(this)
+        if (token.isNullOrBlank()) {
+            renderError("No active session found. Please log in again.")
+            return
+        }
+
         executor.execute {
-            val result = CerberusClient.fetchLogs()
+            // UPDATED: Pass token to the client
+            val result = CerberusClient.fetchLogs(token)
             handler.post {
                 logsContainer.removeAllViews()
                 when (result) {
