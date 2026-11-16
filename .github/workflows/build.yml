@@ -1,4 +1,4 @@
-name: Build Debug APK & Publish
+name: Build Release APK & Publish
 
 on:
   push:
@@ -26,43 +26,28 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Build Debug APK
-      run: ./gradlew assembleDebug
+    - name: Build Release APK
+      run: ./gradlew assembleRelease
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
-    - name: Prepare APK & version.json for Release
+    - name: Prepare APK for Release
       run: |
         mkdir -p release
-        # Copy the APK
-        find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release/CPvpn.apk \;
-        
-        # Extract versionCode and versionName from build.gradle
-        # Handles both Groovy (app/build.gradle) and Kotlin DSL (app/build.gradle.kts)
-        if [ -f app/build.gradle ]; then
-          VERSION_CODE=$(grep -oP 'versionCode\s+\K\d+' app/build.gradle || echo "1")
-          VERSION_NAME=$(grep -oP 'versionName\s+"\K[^"]+' app/build.gradle || echo "1.0.0")
-        else
-          VERSION_CODE=$(grep -oP 'versionCode\s*=\s*\K\d+' app/build.gradle.kts || echo "1")
-          VERSION_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts || echo "1.0.0")
-        fi
-        
-        # Generate version.json
-        echo "{\"versionCode\": $VERSION_CODE, \"versionName\": \"$VERSION_NAME\"}" > release/version.json
-        
-        echo "Generated version.json:"
-        cat release/version.json
+        # Find the generated release APK and rename it to CPvpn.apk
+        find app/build/outputs/apk/release -name "*.apk" -exec cp {} release/CPvpn.apk \;
 
     - name: Create GitHub Release & Upload Asset
       uses: softprops/action-gh-release@v2
       if: github.ref == 'refs/heads/main'
       with:
-        tag_name: v1.0.${{ github.run_number }}-debug
-        name: CPvpn Debug v1.0.${{ github.run_number }}
+        tag_name: v1.0.${{ github.run_number }}-release
+        name: CPvpn Release v1.0.${{ github.run_number }}
         body: |
-          Debug build for UI testing.
+          Release build for OTA testing.
         draft: false
         prerelease: false
         files: |
           release/CPvpn.apk
-          release/version.json
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
