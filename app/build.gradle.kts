@@ -11,8 +11,8 @@ android {
         applicationId = "com.paybridge.cpvpn"
         minSdk = 23
         targetSdk = 34
-        versionCode = 48
-        versionName = "2.1.0"
+        versionCode = 49
+        versionName = "2.1.1"
     }
 
     signingConfigs {
