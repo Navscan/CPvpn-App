@@ -31,11 +31,21 @@ jobs:
       env:
         KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
-    - name: Prepare APK for Release
+    - name: Prepare APK & version.json for Release
       run: |
         mkdir -p release
-        # Find the generated release APK and rename it to CPvpn.apk
+        # Copy the APK
         find app/build/outputs/apk/release -name "*.apk" -exec cp {} release/CPvpn.apk \;
+        
+        # Extract versionCode and versionName from build.gradle.kts
+        VERSION_CODE=$(grep -oP 'versionCode\s*=\s*\K\d+' app/build.gradle.kts)
+        VERSION_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+        
+        # Generate version.json
+        echo "{\"versionCode\": $VERSION_CODE, \"versionName\": \"$VERSION_NAME\"}" > release/version.json
+        
+        echo "Generated version.json:"
+        cat release/version.json
 
     - name: Create GitHub Release & Upload Asset
       uses: softprops/action-gh-release@v2
@@ -49,5 +59,6 @@ jobs:
         prerelease: false
         files: |
           release/CPvpn.apk
+          release/version.json
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
